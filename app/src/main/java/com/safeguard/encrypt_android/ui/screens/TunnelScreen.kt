@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.safeguard.encrypt_android.data.TunnelService
 
 @Composable
 fun TunnelScreen() {
@@ -91,11 +92,25 @@ fun TunnelForm(isCreating: Boolean) {
 
         Button(
             onClick = {
-                mensaje = if (isCreating)
-                    "Intentando crear túnel '$tunnelName'..."
-                else
-                    "Intentando conectar a '$tunnelName' como '$alias'..."
-                // Lógica real se implementará luego
+                if (tunnelName.isBlank() || password.isBlank() || (!isCreating && alias.isBlank())) {
+                    mensaje = "⚠️ Completa todos los campos."
+                    return@Button
+                }
+
+                if (isCreating) {
+                    TunnelService.crearTunel(tunnelName, password) { success, result ->
+                        mensaje = if (success) "✅ Túnel creado con ID: $result" else "❌ Error: $result"
+                    }
+                } else {
+                    TunnelService.verificarTunel(tunnelName, password) { success, id, error ->
+                        if (success && id != null) {
+                            mensaje = "🔗 Conectado al túnel ID: $id"
+                            // Aquí deberías navegar a TunnelChatScreen(id, alias)
+                        } else {
+                            mensaje = "❌ $error"
+                        }
+                    }
+                }
             },
             modifier = Modifier
                 .fillMaxWidth()
