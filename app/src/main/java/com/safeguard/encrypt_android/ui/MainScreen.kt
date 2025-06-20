@@ -27,7 +27,13 @@ fun MainScreen() {
                 val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route
 
                 NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.home), contentDescription = "Inicio") },
+                    icon = {
+                        Icon(
+                            painterResource(id = R.drawable.home),
+                            contentDescription = "Inicio",
+                            modifier = Modifier.size(28.dp)
+                        )
+                    },
                     selected = currentDestination == "home",
                     onClick = { navController.navigate("home") }
                 )
@@ -36,7 +42,7 @@ fun MainScreen() {
                     icon = {
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(44.dp) // Tamaño del botón central ligeramente más grande pero proporcional
                                 .background(Color(0xFF00FFD5), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
@@ -53,12 +59,19 @@ fun MainScreen() {
                 )
 
                 NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.tunnel), contentDescription = "Túneles") },
+                    icon = {
+                        Icon(
+                            painterResource(id = R.drawable.tunnel),
+                            contentDescription = "Túneles",
+                            modifier = Modifier.size(28.dp)
+                        )
+                    },
                     selected = currentDestination == "tunnel",
                     onClick = { navController.navigate("tunnel") }
                 )
             }
         }
+
     ) { innerPadding ->
         NavHost(
             navController = navController,
