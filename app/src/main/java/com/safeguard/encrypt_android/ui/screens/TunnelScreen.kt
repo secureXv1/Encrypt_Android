@@ -11,10 +11,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
 import com.safeguard.encrypt_android.data.TunnelService
 
 @Composable
-fun TunnelScreen() {
+fun TunnelScreen(navController: NavController) {
     var isCreatingTunnel by remember { mutableStateOf(false) }
 
     Column(
@@ -32,7 +33,7 @@ fun TunnelScreen() {
             modifier = Modifier.padding(vertical = 16.dp)
         )
 
-        TunnelForm(isCreating = isCreatingTunnel)
+        TunnelForm(isCreating = isCreatingTunnel, navController = navController)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -46,7 +47,7 @@ fun TunnelScreen() {
 }
 
 @Composable
-fun TunnelForm(isCreating: Boolean) {
+fun TunnelForm(isCreating: Boolean, navController: NavController) {
     var tunnelName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var alias by remember { mutableStateOf("") }
@@ -97,17 +98,23 @@ fun TunnelForm(isCreating: Boolean) {
                     return@Button
                 }
 
+                val uuid = getClientUUID()
+
                 if (isCreating) {
-                    TunnelService.crearTunel(tunnelName, password) { success, result ->
-                        mensaje = if (success) "✅ Túnel creado con ID: $result" else "❌ Error: $result"
+                    TunnelService.crearTunel(tunnelName, password, uuid) { success, tunnelId, error ->
+                        mensaje = if (success) {
+                            "✅ Túnel creado con ID: $tunnelId"
+                        } else {
+                            "❌ Error: $error"
+                        }
                     }
                 } else {
-                    TunnelService.verificarTunel(tunnelName, password) { success, id, error ->
-                        if (success && id != null) {
-                            mensaje = "🔗 Conectado al túnel ID: $id"
-                            // Aquí deberías navegar a TunnelChatScreen(id, alias)
+                    TunnelService.verificarTunel(tunnelName, password, alias) { success, tunnelId, error ->
+                        mensaje = if (success) {
+                            navController.navigate("chat?tunnelId=$tunnelId&alias=$alias")
+                            "🔐 Conectado al túnel ID: $tunnelId"
                         } else {
-                            mensaje = "❌ $error"
+                            "❌ $error"
                         }
                     }
                 }
@@ -138,3 +145,7 @@ fun inputColors(): TextFieldColors = OutlinedTextFieldDefaults.colors(
     unfocusedTextColor = Color.White
 )
 
+fun getClientUUID(): String {
+    // En producción puedes guardar esto en SharedPreferences
+    return "android-demo-uuid"
+}
