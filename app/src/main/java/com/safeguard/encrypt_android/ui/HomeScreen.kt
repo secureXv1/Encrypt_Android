@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material3.BottomNavigation
-import androidx.compose.material3.BottomNavigationItem
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,17 +103,16 @@ fun HomeScreen(userName: String = "User") {
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Barra de navegación inferior
-        BottomNavigation(
+        NavigationBar(
             containerColor = Color(0xFF0E1B1E),
             tonalElevation = 0.dp
         ) {
-            BottomNavigationItem(
+            NavigationBarItem(
                 icon = { Icon(painterResource(id = R.drawable.home), contentDescription = "Inicio") },
                 selected = true,
                 onClick = {}
             )
-            BottomNavigationItem(
+            NavigationBarItem(
                 icon = {
                     Box(
                         modifier = Modifier
@@ -135,7 +132,7 @@ fun HomeScreen(userName: String = "User") {
                 selected = false,
                 onClick = {}
             )
-            BottomNavigationItem(
+            NavigationBarItem(
                 icon = { Icon(painterResource(id = R.drawable.tunnel), contentDescription = "Túnel") },
                 selected = false,
                 onClick = {}
@@ -145,14 +142,23 @@ fun HomeScreen(userName: String = "User") {
 }
 
 @Composable
-fun FeatureCard(title: String, items: List<String>) {
+fun FeatureCard(
+    title: String,
+    items: List<String>,
+    modifier: Modifier = Modifier
+) {
     Card(
-        modifier = Modifier.weight(1f),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2B2D)),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(modifier = Modifier.height(8.dp))
             items.forEach {
                 Text(
@@ -165,3 +171,4 @@ fun FeatureCard(title: String, items: List<String>) {
         }
     }
 }
+
