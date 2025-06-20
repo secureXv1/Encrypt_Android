@@ -1,0 +1,167 @@
+package com.safeguard.endcrypt_android.ui
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.material3.BottomNavigation
+import androidx.compose.material3.BottomNavigationItem
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.safeguard.endcrypt_android.R
+
+@Composable
+fun HomeScreen(userName: String = "User") {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0E1B1E))
+            .padding(horizontal = 16.dp)
+    ) {
+        // Encabezado superior
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.avatar_placeholder),
+                    contentDescription = "Avatar",
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, Color.Green, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text("Bienvenido", color = Color.LightGray, fontSize = 14.sp)
+                    Text(userName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            IconButton(onClick = { /* Navegar a ajustes */ }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.settings),
+                    contentDescription = "Ajustes",
+                    tint = Color.White
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(30.dp))
+
+        // Logo central
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Encrypt",
+                modifier = Modifier.size(160.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
+
+        Text(
+            text = "Encrypt",
+            color = Color(0xFF00FFD5),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Tarjetas informativas
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            FeatureCard(
+                title = "Características de seguridad",
+                items = listOf(
+                    "✅ Cifrado híbrido",
+                    "🗂️ Ocultamiento de archivos dentro de otros",
+                    "🛡️ Chat cifrado por túneles seguros"
+                )
+            )
+            FeatureCard(
+                title = "Consejo de seguridad del día",
+                items = listOf(
+                    "🔒 Nunca compartas tu clave privada.\nMantenla almacenada en un lugar seguro y fuera del dispositivo."
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Barra de navegación inferior
+        BottomNavigation(
+            containerColor = Color(0xFF0E1B1E),
+            tonalElevation = 0.dp
+        ) {
+            BottomNavigationItem(
+                icon = { Icon(painterResource(id = R.drawable.home), contentDescription = "Inicio") },
+                selected = true,
+                onClick = {}
+            )
+            BottomNavigationItem(
+                icon = {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .shadow(8.dp, CircleShape)
+                            .background(Color(0xFF00FFD5), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.lock),
+                            contentDescription = "Encrypt",
+                            tint = Color.Black,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                },
+                selected = false,
+                onClick = {}
+            )
+            BottomNavigationItem(
+                icon = { Icon(painterResource(id = R.drawable.tunnel), contentDescription = "Túnel") },
+                selected = false,
+                onClick = {}
+            )
+        }
+    }
+}
+
+@Composable
+fun FeatureCard(title: String, items: List<String>) {
+    Card(
+        modifier = Modifier.weight(1f),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A2B2D)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(text = title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            items.forEach {
+                Text(
+                    text = it,
+                    color = Color(0xFFB0FDFD),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
+        }
+    }
+}
