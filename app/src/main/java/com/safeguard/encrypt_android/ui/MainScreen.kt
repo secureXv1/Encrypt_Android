@@ -123,7 +123,7 @@ fun MainScreen() {
         ) {
             composable("home") { HomeScreen() }
             composable("encrypt") { EncryptScreen() }
-            composable("tunnel") { TunnelScreen() }
+            composable("tunnel") { TunnelScreen(navController) }
         }
     }
 }

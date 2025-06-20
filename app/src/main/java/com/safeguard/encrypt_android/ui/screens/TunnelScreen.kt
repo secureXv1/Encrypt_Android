@@ -1,5 +1,7 @@
 package com.safeguard.encrypt_android.ui.screens
 
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,11 +10,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.safeguard.encrypt_android.data.ClientService
 import com.safeguard.encrypt_android.data.TunnelService
+import com.safeguard.encrypt_android.utils.UuidUtils.getClientUUID
+import java.util.UUID
 
 @Composable
 fun TunnelScreen(navController: NavController) {
@@ -37,9 +43,11 @@ fun TunnelScreen(navController: NavController) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        TextButton(onClick = { isCreatingTunnel = !isCreatingTunnel }) {
+        TextButton(onClick = {
+            isCreatingTunnel = !isCreatingTunnel
+        }) {
             Text(
-                text = if (isCreatingTunnel) "¿Ya tienes un túnel? Conéctate" else "¿No tienes túnel? Crear uno",
+                text = if (isCreatingTunnel) "¿Ya tienes un túnel? Conectarse" else "¿Nuevo? Crear túnel",
                 color = Color(0xFF00BCD4)
             )
         }
@@ -52,6 +60,7 @@ fun TunnelForm(isCreating: Boolean, navController: NavController) {
     var password by remember { mutableStateOf("") }
     var alias by remember { mutableStateOf("") }
     var mensaje by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -98,23 +107,30 @@ fun TunnelForm(isCreating: Boolean, navController: NavController) {
                     return@Button
                 }
 
-                val uuid = getClientUUID()
+                val uuid = getClientUUID(context)
 
-                if (isCreating) {
-                    TunnelService.crearTunel(tunnelName, password, uuid) { success, tunnelId, error ->
-                        mensaje = if (success) {
-                            "✅ Túnel creado con ID: $tunnelId"
-                        } else {
-                            "❌ Error: $error"
-                        }
+                ClientService.registrarCliente(uuid) { success, error ->
+                    if (!success) {
+                        mensaje = "⚠️ No se pudo registrar cliente: $error"
+                        return@registrarCliente
                     }
-                } else {
-                    TunnelService.verificarTunel(tunnelName, password, alias) { success, tunnelId, error ->
-                        mensaje = if (success) {
-                            navController.navigate("chat?tunnelId=$tunnelId&alias=$alias")
-                            "🔐 Conectado al túnel ID: $tunnelId"
-                        } else {
-                            "❌ $error"
+
+                    if (isCreating) {
+                        TunnelService.crearTunel(tunnelName, password, uuid) { success, tunnelId, error ->
+                            mensaje = if (success) {
+                                "✅ Túnel creado con ID: $tunnelId"
+                            } else {
+                                "❌ Error: $error"
+                            }
+                        }
+                    } else {
+                        TunnelService.verificarTunel(tunnelName, password, alias) { success, tunnelId, error ->
+                            if (success) {
+                                navController.navigate("chat?tunnelId=$tunnelId&alias=$alias")
+                                mensaje = "🔐 Conectado al túnel ID: $tunnelId"
+                            } else {
+                                mensaje = "❌ $error"
+                            }
                         }
                     }
                 }
@@ -145,7 +161,13 @@ fun inputColors(): TextFieldColors = OutlinedTextFieldDefaults.colors(
     unfocusedTextColor = Color.White
 )
 
-fun getClientUUID(): String {
-    // En producción puedes guardar esto en SharedPreferences
-    return "android-demo-uuid"
+// Ya lo tienes en UuidUtils, pero si necesitas aquí una copia local:
+fun getClientUUID(context: Context): String {
+    val prefs: SharedPreferences = context.getSharedPreferences("securex_prefs", Context.MODE_PRIVATE)
+    val existing = prefs.getString("uuid", null)
+    if (existing != null) return existing
+
+    val newUuid = UUID.randomUUID().toString()
+    prefs.edit().putString("uuid", newUuid).apply()
+    return newUuid
 }
