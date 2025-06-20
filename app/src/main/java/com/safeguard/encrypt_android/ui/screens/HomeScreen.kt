@@ -1,4 +1,4 @@
-package com.safeguard.endcrypt_android.ui
+package com.safeguard.encrypt_android.ui.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

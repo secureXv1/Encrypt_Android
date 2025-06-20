@@ -82,4 +82,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     implementation("androidx.compose.material:material:1.6.0")
+
+    implementation(libs.androidx.navigation.compose)
+
 }

@@ -8,9 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.safeguard.endcrypt_android.ui.HomeScreen
 import com.safeguard.encrypt_android.ui.theme.Encrypt_AndroidTheme
-import com.safeguard.endcrypt_android.ui.HomeScreen
+import com.safeguard.encrypt_android.MainScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,11 +21,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    HomeScreen(userName = "User") // 👈 Aquí usamos la pantalla real
+                    MainScreen() // ✅ Renderiza la navegación con barra inferior
                 }
             }
         }
     }
 }
-
-
