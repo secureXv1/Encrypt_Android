@@ -91,53 +91,22 @@ fun HomeScreen(userName: String = "User") {
                     "✅ Cifrado híbrido",
                     "🗂️ Ocultamiento de archivos dentro de otros",
                     "🛡️ Chat cifrado por túneles seguros"
-                )
+                ),
+                modifier = Modifier.weight(0.4f)
             )
             FeatureCard(
                 title = "Consejo de seguridad del día",
                 items = listOf(
                     "🔒 Nunca compartas tu clave privada.\nMantenla almacenada en un lugar seguro y fuera del dispositivo."
-                )
+                ),
+                modifier = Modifier.weight(0.6f)
             )
         }
+
 
         Spacer(modifier = Modifier.weight(1f))
 
-        NavigationBar(
-            containerColor = Color(0xFF0E1B1E),
-            tonalElevation = 0.dp
-        ) {
-            NavigationBarItem(
-                icon = { Icon(painterResource(id = R.drawable.home), contentDescription = "Inicio") },
-                selected = true,
-                onClick = {}
-            )
-            NavigationBarItem(
-                icon = {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .shadow(8.dp, CircleShape)
-                            .background(Color(0xFF00FFD5), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.lock),
-                            contentDescription = "Encrypt",
-                            tint = Color.Black,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                },
-                selected = false,
-                onClick = {}
-            )
-            NavigationBarItem(
-                icon = { Icon(painterResource(id = R.drawable.tunnel), contentDescription = "Túnel") },
-                selected = false,
-                onClick = {}
-            )
-        }
+
     }
 }
 
