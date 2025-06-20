@@ -24,15 +24,33 @@ fun MainScreen() {
         containerColor = Color(0xFF0E1B1E),
         bottomBar = {
             NavigationBar(containerColor = Color(0xFF0E1B1E)) {
-                val currentDestination = navController.currentBackStackEntryAsState().value?.destination?.route
+                val currentDestination = navController
+                    .currentBackStackEntryAsState().value?.destination?.route
 
                 NavigationBarItem(
                     icon = {
-                        Icon(
-                            painterResource(id = R.drawable.home),
-                            contentDescription = "Inicio",
-                            modifier = Modifier.size(28.dp)
-                        )
+                        if (currentDestination == "home") {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(Color(0xFF00FFD5), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painterResource(id = R.drawable.home),
+                                    contentDescription = "Inicio",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        } else {
+                            Icon(
+                                painterResource(id = R.drawable.home),
+                                contentDescription = "Inicio",
+                                modifier = Modifier.size(28.dp),
+                                tint = Color.White
+                            )
+                        }
                     },
                     selected = currentDestination == "home",
                     onClick = { navController.navigate("home") }
@@ -40,17 +58,26 @@ fun MainScreen() {
 
                 NavigationBarItem(
                     icon = {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp) // Tamaño del botón central ligeramente más grande pero proporcional
-                                .background(Color(0xFF00FFD5), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        if (currentDestination == "encrypt") {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(Color(0xFF00FFD5), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painterResource(id = R.drawable.lock),
+                                    contentDescription = "Encrypt",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        } else {
                             Icon(
                                 painterResource(id = R.drawable.lock),
                                 contentDescription = "Encrypt",
-                                tint = Color.Black,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(28.dp),
+                                tint = Color.White
                             )
                         }
                     },
@@ -60,18 +87,34 @@ fun MainScreen() {
 
                 NavigationBarItem(
                     icon = {
-                        Icon(
-                            painterResource(id = R.drawable.tunnel),
-                            contentDescription = "Túneles",
-                            modifier = Modifier.size(28.dp)
-                        )
+                        if (currentDestination == "tunnel") {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(Color(0xFF00FFD5), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painterResource(id = R.drawable.tunnel),
+                                    contentDescription = "Túneles",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        } else {
+                            Icon(
+                                painterResource(id = R.drawable.tunnel),
+                                contentDescription = "Túneles",
+                                modifier = Modifier.size(28.dp),
+                                tint = Color.White
+                            )
+                        }
                     },
                     selected = currentDestination == "tunnel",
                     onClick = { navController.navigate("tunnel") }
                 )
             }
         }
-
     ) { innerPadding ->
         NavHost(
             navController = navController,
