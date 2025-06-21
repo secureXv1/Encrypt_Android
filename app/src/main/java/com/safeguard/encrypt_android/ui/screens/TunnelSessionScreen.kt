@@ -12,6 +12,32 @@ import androidx.navigation.NavController
 import com.safeguard.encrypt_android.data.TunnelClient
 import com.safeguard.encrypt_android.utils.UuidUtils.getClientUUID
 
+data class TunnelMessage(
+    val tunnelId: Int,
+    val alias: String,
+    val type: String,
+    val content: String,
+    val timestamp: Long
+)
+
+fun parseTunnelMessage(raw: String): TunnelMessage? {
+    return try {
+        val outer = org.json.JSONObject(raw)
+        val inner = org.json.JSONObject(outer.getString("contenido"))
+
+        TunnelMessage(
+            tunnelId = outer.getInt("tunnel_id"),
+            alias = outer.getString("alias"),
+            type = inner.getString("tipo"),
+            content = inner.getString("contenido"),
+            timestamp = inner.optLong("enviado_en", System.currentTimeMillis())
+        )
+    } catch (e: Exception) {
+        println("❌ Error al parsear mensaje: ${e.message}")
+        null
+    }
+}
+
 @Composable
 fun TunnelSessionScreen(
     navController: NavController,
@@ -23,11 +49,9 @@ fun TunnelSessionScreen(
     val context = LocalContext.current
     val uuid = remember { getClientUUID(context) }
 
-    // Cliente del túnel
     val tunnelClient = remember { mutableStateOf<TunnelClient?>(null) }
-    val messages = remember { mutableStateListOf<String>() }
+    val messages = remember { mutableStateListOf<TunnelMessage>() }
 
-    // Crear conexión cuando se abre la pantalla
     LaunchedEffect(Unit) {
         val client = TunnelClient(
             tunnelId = tunnelId.toInt(),
@@ -35,9 +59,8 @@ fun TunnelSessionScreen(
             uuid = uuid
         )
 
-        client.onMessageReceived = { mensaje ->
-            println("📩 $mensaje")
-            messages.add(mensaje)
+        client.onMessageReceived = { raw ->
+            parseTunnelMessage(raw)?.let { messages.add(it) }
         }
 
         client.onConnected = { println("🟢 Conectado al túnel") }
@@ -47,11 +70,9 @@ fun TunnelSessionScreen(
         tunnelClient.value = client
     }
 
-    // Desconectar al salir
     DisposableEffect(Unit) {
         onDispose {
             tunnelClient.value?.disconnect()
-
         }
     }
 
@@ -60,7 +81,6 @@ fun TunnelSessionScreen(
             .fillMaxSize()
             .background(Color(0xFF0E1B1E))
     ) {
-        // Pestañas
         TabRow(
             selectedTabIndex = selectedTabIndex,
             containerColor = Color(0xFF1C2A2D),
@@ -81,7 +101,6 @@ fun TunnelSessionScreen(
             }
         }
 
-        // Contenido dinámico por pestaña
         when (selectedTabIndex) {
             0 -> ChatTab(tunnelId = tunnelId, alias = alias, tunnelClient = tunnelClient.value, messages = messages)
             1 -> ParticipantsTab(tunnelId = tunnelId)
