@@ -45,7 +45,8 @@ fun TunnelSessionScreen(
     // Desconectar al salir
     DisposableEffect(Unit) {
         onDispose {
-            tunnelClient.value?.close()
+            tunnelClient.value?.disconnect()
+
         }
     }
 
