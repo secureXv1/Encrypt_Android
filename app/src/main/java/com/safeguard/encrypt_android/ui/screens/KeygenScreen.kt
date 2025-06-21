@@ -15,13 +15,27 @@ import java.io.File
 @Composable
 fun KeygenScreen() {
     val context = LocalContext.current
+    var keyName by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
 
     Column(Modifier.padding(16.dp)) {
         Text("🔐 Crear Llaves RSA", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
+        OutlinedTextField(
+            value = keyName,
+            onValueChange = { keyName = it },
+            label = { Text("Nombre base para las llaves") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(16.dp))
         Button(onClick = {
+            if (keyName.isBlank()) {
+                message = "⚠️ Debes ingresar un nombre."
+                return@Button
+            }
+
             try {
                 val keyPair = KeyUtils.generateRSAKeyPair()
 
@@ -31,24 +45,21 @@ fun KeygenScreen() {
                 val publicPem = wrapAsPem(publicKeyBase64, "PUBLIC KEY")
                 val privatePem = wrapAsPem(privateKeyBase64, "PRIVATE KEY")
 
-                val pubFile = File(context.filesDir, "public.pem")
-                val privFile = File(context.filesDir, "private.pem")
+                val pubFile = File(context.filesDir, "${keyName}_public.pem")
+                val privFile = File(context.filesDir, "${keyName}_private.pem")
 
                 pubFile.writeText(publicPem)
                 privFile.writeText(privatePem)
 
-                message = "Llaves generadas correctamente:\n\n" +
-                        "• public.pem\n• private.pem"
-
-                Toast.makeText(context, "✔️ Llaves guardadas en almacenamiento interno", Toast.LENGTH_LONG).show()
+                message = "✔️ Llaves guardadas como:\n${pubFile.name}\n${privFile.name}"
             } catch (e: Exception) {
-                message = "Error al generar llaves: ${e.message}"
+                message = "❌ Error al generar llaves: ${e.message}"
             }
         }) {
-            Text("Generar y guardar llaves")
+            Text("Generar y guardar")
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
         Text(message, style = MaterialTheme.typography.bodyMedium)
     }
 }
