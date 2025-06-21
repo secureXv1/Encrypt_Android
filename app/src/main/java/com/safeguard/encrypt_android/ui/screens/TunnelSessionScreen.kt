@@ -25,6 +25,7 @@ fun TunnelSessionScreen(
 
     // Cliente del túnel
     val tunnelClient = remember { mutableStateOf<TunnelClient?>(null) }
+    val messages = remember { mutableStateListOf<String>() }
 
     // Crear conexión cuando se abre la pantalla
     LaunchedEffect(Unit) {
@@ -34,7 +35,11 @@ fun TunnelSessionScreen(
             uuid = uuid
         )
 
-        client.onMessageReceived = { mensaje -> println("📩 $mensaje") }
+        client.onMessageReceived = { mensaje ->
+            println("📩 $mensaje")
+            messages.add(mensaje)
+        }
+
         client.onConnected = { println("🟢 Conectado al túnel") }
         client.onDisconnected = { println("🔴 Desconectado del túnel") }
 
@@ -78,7 +83,7 @@ fun TunnelSessionScreen(
 
         // Contenido dinámico por pestaña
         when (selectedTabIndex) {
-            0 -> ChatTab(tunnelId = tunnelId, alias = alias, tunnelClient = tunnelClient.value)
+            0 -> ChatTab(tunnelId = tunnelId, alias = alias, tunnelClient = tunnelClient.value, messages = messages)
             1 -> ParticipantsTab(tunnelId = tunnelId)
             2 -> FilesTab(tunnelId = tunnelId)
         }

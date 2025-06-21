@@ -5,15 +5,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.safeguard.encrypt_android.data.TunnelClient
 
 @Composable
-fun ChatTab(tunnelId: String, alias: String, tunnelClient: TunnelClient?) {
+fun ChatTab(tunnelId: String, alias: String, tunnelClient: TunnelClient?, messages: SnapshotStateList<String>) {
     var message by remember { mutableStateOf("") }
-    val messages = remember { mutableStateListOf<String>() }
+
 
     // Recibir mensajes desde el socket
     LaunchedEffect(tunnelClient) {
