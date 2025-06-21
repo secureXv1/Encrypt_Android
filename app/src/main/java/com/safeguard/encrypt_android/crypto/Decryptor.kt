@@ -4,57 +4,48 @@ package com.safeguard.encrypt_android.crypto
 import android.util.Base64
 import org.json.JSONObject
 import java.io.File
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import java.security.PrivateKey
 
 object Decryptor {
 
-    /**
-     * Descifra un archivo cifrado (.json), detectando el método usado.
-     * @param inputFile Archivo cifrado
-     * @param promptForPassword Función que retorna la contraseña ingresada por el usuario
-     * @param privateKeyPEM Contenido PEM de la clave privada (solo si fue cifrado con llave)
-     * @return Par de (bytes descifrados, extensión sugerida)
-     */
     fun decryptFile(
         inputFile: File,
         promptForPassword: () -> String,
         privateKeyPEM: String? = null
     ): Pair<ByteArray, String> {
         val json = JSONObject(inputFile.readText())
+        val ext = json.optString("ext", ".bin")
 
-        val ext = json.optString("ext", "")
-        val isPasswordEncrypted = json.has("salt_user") && json.has("encrypted_user_password")
-        val isKeyEncrypted = json.has("key_user") && json.has("key_master")
+        val content = Base64.decode(json.getString("content"), Base64.DEFAULT)
 
-        return when {
-            isPasswordEncrypted -> {
-                val result = PasswordCrypto.decryptFileWithPassword(inputFile, promptForPassword)
-                Pair(result.decryptedBytes, ext)
-            }
+        return if (privateKeyPEM != null) {
+            val encryptedKey = Base64.decode(json.getString("key_user"), Base64.DEFAULT)
+            val iv = Base64.decode(json.getString("iv"), Base64.DEFAULT)
 
-            isKeyEncrypted && privateKeyPEM != null -> {
-                val privateKey = RSAUtils.loadPrivateKeyFromPEM(privateKeyPEM)
+            val aesKeyBytes = CryptoUtils.decryptKeyWithPrivateKey(encryptedKey, privateKeyPEM)
+            val secretKey = SecretKeySpec(aesKeyBytes, "AES")
 
-                val encryptedKeyUser = Base64.decode(json.getString("key_user"), Base64.NO_WRAP)
-                val encryptedKeyMaster = Base64.decode(json.getString("key_master"), Base64.NO_WRAP)
-                val encryptedData = Base64.decode(json.getString("data"), Base64.NO_WRAP)
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
+            val decrypted = cipher.doFinal(content)
 
-                // Intentar con clave del usuario, luego con clave maestra
-                val aesKey = try {
-                    RSAUtils.decryptWithRSAOAEP(encryptedKeyUser, privateKey)
-                } catch (e: Exception) {
-                    RSAUtils.decryptWithRSAOAEP(encryptedKeyMaster, privateKey)
-                }
+            Pair(decrypted, ext)
 
-                val aesKeySpec = javax.crypto.spec.SecretKeySpec(aesKey, "AES")
-                val decryptedBytes = AESUtils.decryptAES(encryptedData, aesKeySpec)
+        } else {
+            val password = promptForPassword()
+            val keyIvCombined = Base64.decode(json.getString("key_user"), Base64.DEFAULT)
+            val salt = keyIvCombined.sliceArray(0 until 16)
+            val iv = keyIvCombined.sliceArray(16 until 32)
+            val secretKey = CryptoUtils.deriveKeyFromPassword(password, salt)
 
-                Pair(decryptedBytes, ext)
-            }
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
+            val decrypted = cipher.doFinal(content)
 
-            else -> {
-                throw Exception("Archivo cifrado con formato no reconocido o incompleto.")
-            }
+            Pair(decrypted, ext)
         }
     }
 }

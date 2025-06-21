@@ -1,6 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.safeguard.endcrypt_android"> <!-- ✅ Agrega esto si no lo tenías -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -20,10 +20,10 @@
         android:theme="@style/Theme.Encrypt_Android"
         tools:targetApi="31">
 
-        <!-- ✅ FileProvider para compartir archivos con otras apps -->
+        <!-- ✅ FileProvider con package name explícito -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.provider"
+            android:authorities="com.safeguard.endcrypt_android.provider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

@@ -7,20 +7,17 @@ import androidx.core.content.FileProvider
 import java.io.File
 import android.database.Cursor
 import android.provider.OpenableColumns
+import android.widget.Toast
 
 
 fun openOutputFolder(context: Context, folder: File) {
-    val uri: Uri = FileProvider.getUriForFile(
+    Toast.makeText(
         context,
-        "${context.packageName}.provider",
-        folder
-    )
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, "*/*")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    context.startActivity(intent)
+        "📁 Archivo guardado en:\n${folder.absolutePath}",
+        Toast.LENGTH_LONG
+    ).show()
 }
+
 
 
 fun getFileNameFromUri(context: Context, uri: Uri): String? {

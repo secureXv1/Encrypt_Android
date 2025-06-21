@@ -5,34 +5,23 @@ import java.io.File
 
 object CryptoController {
 
-    enum class EncryptionMethod {
-        PASSWORD,
-        PUBLIC_KEY
-    }
-
     /**
-     * Cifra un archivo según el método elegido.
-     *
-     * @param inputFile Archivo original
-     * @param method Método elegido (contraseña o clave pública)
-     * @param outputFile Archivo JSON resultante
-     * @param password Contraseña (si aplica)
-     * @param publicKeyPEM Contenido PEM (si aplica)
+     * Cifra un archivo usando el método seleccionado (contraseña o clave pública).
      */
     fun encrypt(
         inputFile: File,
-        method: EncryptionMethod,
+        method: Encryptor.Metodo,
         outputFile: File,
         password: String? = null,
         publicKeyPEM: String? = null
     ) {
         when (method) {
-            EncryptionMethod.PASSWORD -> {
+            Encryptor.Metodo.PASSWORD -> {
                 require(!password.isNullOrBlank()) { "Se requiere una contraseña válida." }
                 Encryptor.encryptWithPassword(inputFile, password, outputFile)
             }
 
-            EncryptionMethod.PUBLIC_KEY -> {
+            Encryptor.Metodo.RSA -> {
                 require(!publicKeyPEM.isNullOrBlank()) { "Se requiere una clave pública válida." }
                 Encryptor.encryptWithPublicKey(inputFile, publicKeyPEM, outputFile)
             }
@@ -40,12 +29,7 @@ object CryptoController {
     }
 
     /**
-     * Descifra un archivo cifrado (.json)
-     *
-     * @param inputFile Archivo .json cifrado
-     * @param promptForPassword Función que retorna una contraseña (mostrada en un diálogo)
-     * @param privateKeyPEM Clave privada si fue cifrado con llave
-     * @param outputFile Archivo de salida final
+     * Descifra un archivo cifrado (.json), usando contraseña o clave privada.
      */
     fun decrypt(
         inputFile: File,

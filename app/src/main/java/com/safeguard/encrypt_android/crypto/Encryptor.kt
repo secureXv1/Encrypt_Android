@@ -3,64 +3,62 @@ package com.safeguard.encrypt_android.crypto
 import android.util.Base64
 import org.json.JSONObject
 import java.io.File
-import javax.crypto.SecretKey
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 object Encryptor {
 
     enum class Metodo {
-        PASSWORD, RSA
+        PASSWORD,
+        RSA
     }
 
     /**
-     * Cifra un archivo con contraseña.
-     * Usa doble cifrado: contenido + contraseña protegida por el administrador.
+     * Cifra un archivo con contraseña (PBKDF2 + AES-CBC).
+     * Incluye salt y vector de inicialización (iv) concatenados y codificados.
      */
     fun encryptWithPassword(inputFile: File, password: String, outputFile: File) {
-        PasswordCrypto.encryptFileWithPassword(inputFile, password, outputFile)
+        val salt = CryptoUtils.generateRandomBytes(16)
+        val iv = CryptoUtils.generateRandomBytes(16)
+        val secretKey = CryptoUtils.deriveKeyFromPassword(password, salt)
+
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, IvParameterSpec(iv))
+
+        val encrypted = cipher.doFinal(inputFile.readBytes())
+        val json = JSONObject()
+
+        json.put("key_user", Base64.encodeToString(salt + iv, Base64.NO_WRAP))  // salt + iv
+        json.put("content", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+        json.put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
+        json.put("type", "password")
+
+        outputFile.writeText(json.toString())
     }
 
     /**
-     * Cifra un archivo con clave pública del destinatario y clave maestra.
+     * Cifra un archivo con clave pública del usuario y del administrador.
+     * El AES generado se cifra con ambas y se guarda junto con el contenido cifrado.
      */
-    fun encryptWithPublicKey(inputFile: File, userPublicKeyPEM: String, outputFile: File) {
-        val fileBytes = inputFile.readBytes()
-        val ext = inputFile.extension
+    fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String, outputFile: File) {
+        val secretKey = CryptoUtils.generateAESKey()
+        val iv = CryptoUtils.generateRandomBytes(16)
 
-        // Serializar contenido original
-        val originalPayload = JSONObject(
-            mapOf(
-                "ext" to ".$ext",
-                "content" to Base64.encodeToString(fileBytes, Base64.NO_WRAP)
-            )
-        )
-        val serialized = originalPayload.toString().toByteArray()
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, IvParameterSpec(iv))
 
-        // 1️⃣ Generar clave AES
-        val aesKeyBytes = ByteArray(32)
-        java.security.SecureRandom().nextBytes(aesKeyBytes)
-        val aesKey = SecretKeySpec(aesKeyBytes, "AES")
+        val encrypted = cipher.doFinal(inputFile.readBytes())
+        val encryptedKeyUser = CryptoUtils.encryptKeyWithPublicKey(secretKey.encoded, publicKeyPEM)
+        val encryptedKeyMaster = CryptoUtils.encryptKeyWithPublicKey(secretKey.encoded, MasterKey.PUBLIC_KEY_PEM)
 
-        // 2️⃣ Cifrar datos
-        val encryptedData = AESUtils.encryptAES(serialized, aesKey)
-
-        // 3️⃣ Cargar claves públicas
-        val userPubKey = RSAUtils.loadPublicKeyFromPEM(userPublicKeyPEM)
-        val masterPubKey = RSAUtils.loadPublicKeyFromPEM(MasterKey.PUBLIC_KEY_PEM)
-
-        // 4️⃣ Cifrar la clave AES con ambas
-        val encryptedKeyUser = RSAUtils.encryptWithRSAOAEP(aesKeyBytes, userPubKey)
-        val encryptedKeyMaster = RSAUtils.encryptWithRSAOAEP(aesKeyBytes, masterPubKey)
-
-        // 5️⃣ Serializar resultado
-        val json = JSONObject(
-            mapOf(
-                "key_user" to Base64.encodeToString(encryptedKeyUser, Base64.NO_WRAP),
-                "key_master" to Base64.encodeToString(encryptedKeyMaster, Base64.NO_WRAP),
-                "data" to Base64.encodeToString(encryptedData, Base64.NO_WRAP),
-                "ext" to ".$ext"
-            )
-        )
+        val json = JSONObject()
+        json.put("key_user", Base64.encodeToString(encryptedKeyUser, Base64.NO_WRAP))
+        json.put("key_master", Base64.encodeToString(encryptedKeyMaster, Base64.NO_WRAP))
+        json.put("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
+        json.put("content", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+        json.put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
+        json.put("type", "rsa")
 
         outputFile.writeText(json.toString())
     }
