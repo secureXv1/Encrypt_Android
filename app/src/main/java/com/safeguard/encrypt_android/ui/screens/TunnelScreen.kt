@@ -126,7 +126,7 @@ fun TunnelForm(isCreating: Boolean, navController: NavController) {
                     } else {
                         TunnelService.verificarTunel(tunnelName, password, alias) { success, tunnelId, error ->
                             if (success) {
-                                navController.navigate("chat?tunnelId=$tunnelId&alias=$alias")
+                                navController.navigate("tunnel_session/$tunnelId/$alias")
                                 mensaje = "🔐 Conectado al túnel ID: $tunnelId"
                             } else {
                                 mensaje = "❌ $error"

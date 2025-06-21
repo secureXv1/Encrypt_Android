@@ -10,11 +10,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.navArgument
 import com.safeguard.endcrypt_android.R
 import com.safeguard.encrypt_android.ui.screens.HomeScreen
 import com.safeguard.encrypt_android.ui.screens.EncryptScreen
 import com.safeguard.encrypt_android.ui.screens.TunnelScreen
+import com.safeguard.encrypt_android.ui.screens.TunnelSessionScreen
 
 @Composable
 fun MainScreen() {
@@ -124,6 +127,19 @@ fun MainScreen() {
             composable("home") { HomeScreen() }
             composable("encrypt") { EncryptScreen() }
             composable("tunnel") { TunnelScreen(navController) }
+
+            composable(
+                route = "tunnel_session/{tunnelId}/{alias}",
+                arguments = listOf(
+                    navArgument("tunnelId") { type = NavType.StringType },
+                    navArgument("alias") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val tunnelId = backStackEntry.arguments?.getString("tunnelId") ?: ""
+                val alias = backStackEntry.arguments?.getString("alias") ?: ""
+                TunnelSessionScreen(navController = navController, tunnelId = tunnelId, alias = alias)
+            }
         }
     }
+
 }
