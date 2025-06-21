@@ -1,5 +1,6 @@
 package com.safeguard.encrypt_android.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,8 @@ import com.safeguard.encrypt_android.data.TunnelClient
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.ui.platform.LocalContext
+
 
 
 fun formatTime(timestamp: Long): String {
@@ -25,6 +28,7 @@ fun formatTime(timestamp: Long): String {
 
 @Composable
 fun MessageBubble(message: TunnelMessage, isOwnMessage: Boolean) {
+    val context = LocalContext.current
     val bubbleColor = if (isOwnMessage) Color(0xFF00BCD4) else Color(0xFF333333)
     val textColor = if (isOwnMessage) Color.Black else Color.White
 
@@ -49,11 +53,11 @@ fun MessageBubble(message: TunnelMessage, isOwnMessage: Boolean) {
             tonalElevation = 2.dp
         ) {
             if (message.type == "archivo" || message.content.startsWith("http") && message.content.contains("/uploads/")) {
-
                 val nombre = obtenerNombreRealDesdeUrl(message.content)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
+                        .clickable { descargarArchivo(context, message.content, nombre) }
                         .padding(10.dp)
                         .widthIn(max = 260.dp)
                 ) {
@@ -78,6 +82,7 @@ fun MessageBubble(message: TunnelMessage, isOwnMessage: Boolean) {
         )
     }
 }
+
 
 
 @Composable

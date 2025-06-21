@@ -10,40 +10,75 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import android.app.DownloadManager
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalContext
+
 
 @Composable
-fun FilesTab(tunnelId: String) {
-    var archivos by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+fun FilesTab(tunnelId: String, messages: List<TunnelMessage>) {
+    val context = LocalContext.current
 
-    LaunchedEffect(tunnelId) {
-        archivos = obtenerArchivos(tunnelId)
+    val archivos = remember(messages) {
+        val extensionesArchivo = listOf(
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg",
+            ".mp3", ".wav", ".ogg", ".mp4", ".avi", ".mkv", ".mov",
+            ".zip", ".rar", ".7z", ".tar", ".gz", ".json", ".txt", ".csv"
+        )
+
+        messages.filter { msg ->
+            msg.content.startsWith("http") &&
+                    extensionesArchivo.any { ext -> msg.content.lowercase().endsWith(ext) }
+        }.map {
+            val nombre = obtenerNombreRealDesdeUrl(it.content)
+            nombre to it.content
+        }.distinctBy { it.second }
     }
 
-    Column(modifier = Modifier
-        .fillMaxSize()
-        .background(Color(0xFF0E1B1E))
-        .padding(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0E1B1E))
+            .padding(16.dp)
     ) {
         Text("📁 Archivos Compartidos", color = Color.White)
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyColumn {
-            items(archivos) { (filename, url) ->
-                Text(
-                    text = filename,
-                    color = Color(0xFF00BCD4),
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
+        if (archivos.isEmpty()) {
+            Text("No se han compartido archivos aún", color = Color.Gray)
+        } else {
+            LazyColumn {
+                items(archivos) { (nombre, url) ->
+                    Row(
+                        modifier = Modifier
+                            .padding(vertical = 6.dp)
+                            .fillMaxWidth()
+                            .clickable { descargarArchivo(context, url, nombre) }
+                    ) {
+                        Text(text = "📄", fontSize = 20.sp, color = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = nombre, color = Color(0xFF00BCD4))
+                    }
+                }
             }
         }
     }
 }
+
+
+
 
 suspend fun obtenerArchivos(tunnelId: String): List<Pair<String, String>> = withContext(Dispatchers.IO) {
     try {
@@ -72,3 +107,21 @@ suspend fun obtenerArchivos(tunnelId: String): List<Pair<String, String>> = with
     return@withContext emptyList()
 }
 
+
+fun descargarArchivo(context: Context, url: String, nombre: String) {
+    try {
+        val uri = Uri.parse(url)
+        val request = DownloadManager.Request(uri)
+        request.setTitle("Descargando $nombre")
+        request.setDescription("Archivo desde túnel")
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, nombre)
+
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        downloadManager.enqueue(request)
+
+        Toast.makeText(context, "📥 Descargando $nombre...", Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        Toast.makeText(context, "❌ Error: ${e.message}", Toast.LENGTH_LONG).show()
+    }
+}

@@ -104,7 +104,7 @@ fun TunnelSessionScreen(
         when (selectedTabIndex) {
             0 -> ChatTab(tunnelId = tunnelId, alias = alias, tunnelClient = tunnelClient.value, messages = messages)
             1 -> ParticipantsTab(tunnelId = tunnelId)
-            2 -> FilesTab(tunnelId = tunnelId)
+            2 -> FilesTab(tunnelId = tunnelId, messages = messages)
         }
     }
 }
