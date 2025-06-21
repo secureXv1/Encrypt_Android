@@ -1,6 +1,5 @@
 package com.safeguard.encrypt_android.crypto
 
-import android.util.Base64
 import org.json.JSONObject
 import java.io.File
 import javax.crypto.Cipher
@@ -15,8 +14,14 @@ object Encryptor {
     }
 
     /**
+     * Convierte ByteArray a hex (para compatibilidad con Windows)
+     */
+    private fun ByteArray.toHexString(): String =
+        joinToString("") { "%02x".format(it) }
+
+    /**
      * Cifra un archivo con contraseña (PBKDF2 + AES-CBC).
-     * Incluye salt y vector de inicialización (iv) concatenados y codificados.
+     * Serializa campos en HEX para que Windows pueda usar fromhex().
      */
     fun encryptWithPassword(inputFile: File, password: String, outputFile: File) {
         val salt = CryptoUtils.generateRandomBytes(16)
@@ -29,8 +34,8 @@ object Encryptor {
         val encrypted = cipher.doFinal(inputFile.readBytes())
         val json = JSONObject()
 
-        json.put("key_user", Base64.encodeToString(salt + iv, Base64.NO_WRAP))  // salt + iv
-        json.put("content", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+        json.put("key_user", (salt + iv).toHexString())
+        json.put("data", encrypted.toHexString())
         json.put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
         json.put("type", "password")
 
@@ -39,7 +44,7 @@ object Encryptor {
 
     /**
      * Cifra un archivo con clave pública del usuario y del administrador.
-     * El AES generado se cifra con ambas y se guarda junto con el contenido cifrado.
+     * Serializa claves y datos en HEX para Windows.
      */
     fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String, outputFile: File) {
         val secretKey = CryptoUtils.generateAESKey()
@@ -53,10 +58,10 @@ object Encryptor {
         val encryptedKeyMaster = CryptoUtils.encryptKeyWithPublicKey(secretKey.encoded, MasterKey.PUBLIC_KEY_PEM)
 
         val json = JSONObject()
-        json.put("key_user", Base64.encodeToString(encryptedKeyUser, Base64.NO_WRAP))
-        json.put("key_master", Base64.encodeToString(encryptedKeyMaster, Base64.NO_WRAP))
-        json.put("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
-        json.put("content", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+        json.put("key_user", encryptedKeyUser.toHexString())
+        json.put("key_master", encryptedKeyMaster.toHexString())
+        json.put("iv", iv.toHexString())
+        json.put("data", encrypted.toHexString())
         json.put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
         json.put("type", "rsa")
 
