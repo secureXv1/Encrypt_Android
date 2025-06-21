@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -46,23 +47,28 @@ fun FilesTab(tunnelId: String) {
 
 suspend fun obtenerArchivos(tunnelId: String): List<Pair<String, String>> = withContext(Dispatchers.IO) {
     try {
-        val url = URL("http://symbolsaps.ddns.net:8000/api/tunnels/$tunnelId/files")  // Cambia IP según entorno
+        val url = URL("http://symbolsaps.ddns.net:8000/api/tunnels/$tunnelId/files")
         val conn = url.openConnection() as HttpURLConnection
         conn.requestMethod = "GET"
 
         if (conn.responseCode == 200) {
             val response = conn.inputStream.bufferedReader().readText()
-            val json = JSONArray(org.json.JSONObject(response).getJSONArray("files").toString())
+            val filesArray = JSONObject(response).getJSONArray("files")
 
-            return@withContext (0 until json.length()).map { i ->
-                val obj = json.getJSONObject(i)
-                obj.getString("filename") to obj.getString("url")
+            val result = mutableListOf<Pair<String, String>>()
+            for (i in 0 until filesArray.length()) {
+                val file = filesArray.getJSONObject(i)
+                result.add(file.getString("filename") to file.getString("url"))
             }
+
+            Log.d("FilesTab", "Archivos recibidos: $result")
+            return@withContext result
         } else {
             Log.e("FilesTab", "Error: ${conn.responseCode}")
         }
     } catch (e: Exception) {
-        Log.e("FilesTab", "Error: ${e.message}")
+        Log.e("FilesTab", "Excepción: ${e.message}")
     }
     return@withContext emptyList()
 }
+
