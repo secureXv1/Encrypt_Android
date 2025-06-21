@@ -13,9 +13,15 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.safeguard.encrypt_android.ui.screens.DecryptScreen
+import com.safeguard.encrypt_android.ui.screens.EncryptFileScreen
 import com.safeguard.endcrypt_android.R
 import com.safeguard.encrypt_android.ui.screens.HomeScreen
 import com.safeguard.encrypt_android.ui.screens.EncryptScreen
+import com.safeguard.encrypt_android.ui.screens.ExtractAndDecryptScreen
+import com.safeguard.encrypt_android.ui.screens.ExtractHiddenFileScreen
+import com.safeguard.encrypt_android.ui.screens.HideFileScreen
+import com.safeguard.encrypt_android.ui.screens.KeygenScreen
 import com.safeguard.encrypt_android.ui.screens.TunnelScreen
 import com.safeguard.encrypt_android.ui.screens.TunnelSessionScreen
 
@@ -125,8 +131,15 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("home") { HomeScreen() }
-            composable("encrypt") { EncryptScreen() }
+            composable("encrypt") { EncryptScreen(navController) }
             composable("tunnel") { TunnelScreen(navController) }
+
+            composable("keygen") { KeygenScreen() }
+            composable("encrypt_file") { EncryptFileScreen() }
+            composable("decrypt_file") { DecryptScreen() }
+            composable("hide_file") { HideFileScreen() }
+            composable("extract_hidden") { ExtractHiddenFileScreen() }
+            composable("extract_and_decrypt") { ExtractAndDecryptScreen() }
 
             composable(
                 route = "tunnel_session/{tunnelId}/{alias}",
@@ -140,6 +153,7 @@ fun MainScreen() {
                 TunnelSessionScreen(navController = navController, tunnelId = tunnelId, alias = alias)
             }
         }
+
     }
 
 }
