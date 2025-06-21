@@ -30,7 +30,7 @@ fun EncryptScreen(navController: NavController) {
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        MenuButton("Crear Llaves", Icons.Default.VpnKey) {
+        MenuButton("Llaves", Icons.Default.VpnKey) {
             navController.navigate("keygen")
         }
 

@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Permite compartir cualquier archivo dentro de /Android/data/<package>/files/EncryptApp -->
+
+    <!-- Archivos cifrados en /Android/data/<package>/files/EncryptApp -->
     <external-files-path
         name="encrypted_files"
         path="EncryptApp/" />
+
+    <!-- Llaves generadas y guardadas en context.filesDir -->
+    <files-path
+        name="pem_files"
+        path="." />
+
 </paths>
