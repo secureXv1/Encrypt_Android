@@ -6,8 +6,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.safeguard.encrypt_android.data.TunnelClient
+import com.safeguard.encrypt_android.utils.UuidUtils.getClientUUID
 
 @Composable
 fun TunnelSessionScreen(
@@ -17,13 +20,41 @@ fun TunnelSessionScreen(
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Chat", "Participantes", "Archivos")
+    val context = LocalContext.current
+    val uuid = remember { getClientUUID(context) }
+
+    // Cliente del túnel
+    val tunnelClient = remember { mutableStateOf<TunnelClient?>(null) }
+
+    // Crear conexión cuando se abre la pantalla
+    LaunchedEffect(Unit) {
+        val client = TunnelClient(
+            tunnelId = tunnelId.toInt(),
+            alias = alias,
+            uuid = uuid
+        )
+
+        client.onMessageReceived = { mensaje -> println("📩 $mensaje") }
+        client.onConnected = { println("🟢 Conectado al túnel") }
+        client.onDisconnected = { println("🔴 Desconectado del túnel") }
+
+        client.connect()
+        tunnelClient.value = client
+    }
+
+    // Desconectar al salir
+    DisposableEffect(Unit) {
+        onDispose {
+            tunnelClient.value?.close()
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0E1B1E))
     ) {
-        // Pestañas superiores
+        // Pestañas
         TabRow(
             selectedTabIndex = selectedTabIndex,
             containerColor = Color(0xFF1C2A2D),
@@ -44,9 +75,9 @@ fun TunnelSessionScreen(
             }
         }
 
-        // Contenido dinámico según pestaña seleccionada
+        // Contenido dinámico por pestaña
         when (selectedTabIndex) {
-            0 -> ChatTab(tunnelId = tunnelId, alias = alias)
+            0 -> ChatTab(tunnelId = tunnelId, alias = alias, tunnelClient = tunnelClient.value)
             1 -> ParticipantsTab(tunnelId = tunnelId)
             2 -> FilesTab(tunnelId = tunnelId)
         }

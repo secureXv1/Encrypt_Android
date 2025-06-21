@@ -126,7 +126,10 @@ fun TunnelForm(isCreating: Boolean, navController: NavController) {
                     } else {
                         TunnelService.verificarTunel(tunnelName, password, alias) { success, tunnelId, error ->
                             if (success) {
-                                navController.navigate("tunnel_session/$tunnelId/$alias")
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    navController.navigate("tunnel_session/$tunnelId/$alias")
+                                }
+
                                 mensaje = "🔐 Conectado al túnel ID: $tunnelId"
                             } else {
                                 mensaje = "❌ $error"

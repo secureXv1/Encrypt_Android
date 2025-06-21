@@ -1,23 +1,37 @@
-// ChatTab.kt
 package com.safeguard.encrypt_android.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import com.safeguard.encrypt_android.data.TunnelClient
 
 @Composable
-fun ChatTab(tunnelId: String, alias: String) {
+fun ChatTab(tunnelId: String, alias: String, tunnelClient: TunnelClient?) {
     var message by remember { mutableStateOf("") }
     val messages = remember { mutableStateListOf<String>() }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    // Recibir mensajes desde el socket
+    LaunchedEffect(tunnelClient) {
+        tunnelClient?.onMessageReceived = { incoming ->
+            if (!incoming.isNullOrBlank()) {
+                messages.add(incoming)
+            }
+        }
+    }
+
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(16.dp)) {
+
         LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
             reverseLayout = true
         ) {
             items(messages.reversed()) { msg ->
@@ -39,15 +53,18 @@ fun ChatTab(tunnelId: String, alias: String) {
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White
                 )
-
             )
-            Button(onClick = {
-                if (message.isNotBlank()) {
-                    messages.add("Tú: $message")
-                    // TODO: Enviar por socket
-                    message = ""
-                }
-            }, modifier = Modifier.padding(start = 8.dp)) {
+            Button(
+                onClick = {
+                    if (message.isNotBlank()) {
+                        val outgoing = "$alias: $message"
+                        messages.add("Tú: $message")
+                        tunnelClient?.sendMessage(outgoing)
+                        message = ""
+                    }
+                },
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
                 Text("Enviar")
             }
         }
