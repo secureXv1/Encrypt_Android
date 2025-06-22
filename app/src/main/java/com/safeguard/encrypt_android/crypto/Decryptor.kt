@@ -1,15 +1,20 @@
-// crypto/Decryptor.kt
 package com.safeguard.encrypt_android.crypto
 
-import android.util.Base64
 import org.json.JSONObject
 import java.io.File
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import java.security.PrivateKey
 
 object Decryptor {
+
+    private fun String.hexToByteArray(): ByteArray {
+        val len = this.length
+        require(len % 2 == 0) { "Hex string must have even length" }
+        return ByteArray(len / 2) { i ->
+            substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        }
+    }
 
     fun decryptFile(
         inputFile: File,
@@ -18,34 +23,56 @@ object Decryptor {
     ): Pair<ByteArray, String> {
         val json = JSONObject(inputFile.readText())
         val ext = json.optString("ext", ".bin")
+        val type = json.optString("type", "password")
 
-        val content = Base64.decode(json.getString("content"), Base64.DEFAULT)
+        val encryptedHex = when {
+            json.has("data") -> json.getString("data")
+            json.has("content") -> json.getString("content")
+            else -> throw IllegalArgumentException("❌ No se encontró campo 'data' ni 'content'")
+        }
 
-        return if (privateKeyPEM != null) {
-            val encryptedKey = Base64.decode(json.getString("key_user"), Base64.DEFAULT)
-            val iv = Base64.decode(json.getString("iv"), Base64.DEFAULT)
+        val encryptedBytes = encryptedHex.hexToByteArray()
 
-            val aesKeyBytes = CryptoUtils.decryptKeyWithPrivateKey(encryptedKey, privateKeyPEM)
-            val secretKey = SecretKeySpec(aesKeyBytes, "AES")
+        return when (type) {
+            "rsa" -> {
+                if (privateKeyPEM.isNullOrBlank()) {
+                    throw IllegalArgumentException("❌ Se requiere una clave privada para este archivo.")
+                }
 
-            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
-            val decrypted = cipher.doFinal(content)
+                val encryptedKeyHex = json.getString("key_user")
+                val ivHex = json.getString("iv")
 
-            Pair(decrypted, ext)
+                val aesKeyBytes = CryptoUtils.decryptKeyWithPrivateKey(
+                    encryptedKeyHex.hexToByteArray(),
+                    privateKeyPEM
+                )
 
-        } else {
-            val password = promptForPassword()
-            val keyIvCombined = Base64.decode(json.getString("key_user"), Base64.DEFAULT)
-            val salt = keyIvCombined.sliceArray(0 until 16)
-            val iv = keyIvCombined.sliceArray(16 until 32)
-            val secretKey = CryptoUtils.deriveKeyFromPassword(password, salt)
+                val secretKey = SecretKeySpec(aesKeyBytes, "AES")
+                val iv = ivHex.hexToByteArray()
 
-            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
-            val decrypted = cipher.doFinal(content)
+                val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
+                val decrypted = cipher.doFinal(encryptedBytes)
 
-            Pair(decrypted, ext)
+                Pair(decrypted, ext)
+            }
+
+            "password" -> {
+                val password = promptForPassword()
+                val keyIvCombined = json.getString("key_user").hexToByteArray()
+                val salt = keyIvCombined.sliceArray(0 until 16)
+                val iv = keyIvCombined.sliceArray(16 until 32)
+
+                val secretKey = CryptoUtils.deriveKeyFromPassword(password, salt)
+
+                val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
+                val decrypted = cipher.doFinal(encryptedBytes)
+
+                Pair(decrypted, ext)
+            }
+
+            else -> throw IllegalArgumentException("❌ Tipo de archivo cifrado desconocido: $type")
         }
     }
 }

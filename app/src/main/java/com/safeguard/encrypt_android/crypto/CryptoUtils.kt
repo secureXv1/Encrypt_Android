@@ -1,4 +1,3 @@
-// crypto/CryptoUtils.kt
 package com.safeguard.encrypt_android.crypto
 
 import android.util.Base64
@@ -33,14 +32,14 @@ object CryptoUtils {
 
     fun encryptKeyWithPublicKey(secretKey: ByteArray, publicKeyPEM: String): ByteArray {
         val publicKey = decodePublicKey(publicKeyPEM)
-        val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding")
+        val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
         cipher.init(Cipher.ENCRYPT_MODE, publicKey)
         return cipher.doFinal(secretKey)
     }
 
     fun decryptKeyWithPrivateKey(encryptedKey: ByteArray, privateKeyPEM: String): ByteArray {
         val privateKey = decodePrivateKey(privateKeyPEM)
-        val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding")
+        val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
         cipher.init(Cipher.DECRYPT_MODE, privateKey)
         return cipher.doFinal(encryptedKey)
     }

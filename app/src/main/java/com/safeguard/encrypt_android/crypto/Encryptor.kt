@@ -14,14 +14,14 @@ object Encryptor {
     }
 
     /**
-     * Convierte ByteArray a hex (para compatibilidad con Windows)
+     * Convierte ByteArray a string hexadecimal.
      */
     private fun ByteArray.toHexString(): String =
         joinToString("") { "%02x".format(it) }
 
     /**
-     * Cifra un archivo con contraseña (PBKDF2 + AES-CBC).
-     * Serializa campos en HEX para que Windows pueda usar fromhex().
+     * Cifra un archivo con contraseña utilizando AES-CBC y derivación PBKDF2.
+     * Guarda la salida en formato HEX compatible con Windows (fromhex()).
      */
     fun encryptWithPassword(inputFile: File, password: String, outputFile: File) {
         val salt = CryptoUtils.generateRandomBytes(16)
@@ -32,19 +32,20 @@ object Encryptor {
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, IvParameterSpec(iv))
 
         val encrypted = cipher.doFinal(inputFile.readBytes())
-        val json = JSONObject()
-
-        json.put("key_user", (salt + iv).toHexString())
-        json.put("data", encrypted.toHexString())
-        json.put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
-        json.put("type", "password")
+        val json = JSONObject().apply {
+            put("key_user", (salt + iv).toHexString())
+            put("data", encrypted.toHexString())
+            put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
+            put("type", "password")
+        }
 
         outputFile.writeText(json.toString())
     }
 
     /**
-     * Cifra un archivo con clave pública del usuario y del administrador.
-     * Serializa claves y datos en HEX para Windows.
+     * Cifra un archivo con clave pública del usuario y la clave pública maestra (admin).
+     * Los datos se cifran con AES-CBC y la clave AES se cifra con RSA.
+     * Todo se serializa en HEX para mantener compatibilidad con sistemas que usan .hex().
      */
     fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String, outputFile: File) {
         val secretKey = CryptoUtils.generateAESKey()
@@ -54,16 +55,18 @@ object Encryptor {
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, IvParameterSpec(iv))
 
         val encrypted = cipher.doFinal(inputFile.readBytes())
+
         val encryptedKeyUser = CryptoUtils.encryptKeyWithPublicKey(secretKey.encoded, publicKeyPEM)
         val encryptedKeyMaster = CryptoUtils.encryptKeyWithPublicKey(secretKey.encoded, MasterKey.PUBLIC_KEY_PEM)
 
-        val json = JSONObject()
-        json.put("key_user", encryptedKeyUser.toHexString())
-        json.put("key_master", encryptedKeyMaster.toHexString())
-        json.put("iv", iv.toHexString())
-        json.put("data", encrypted.toHexString())
-        json.put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
-        json.put("type", "rsa")
+        val json = JSONObject().apply {
+            put("key_user", encryptedKeyUser.toHexString())
+            put("key_master", encryptedKeyMaster.toHexString())
+            put("iv", iv.toHexString())
+            put("data", encrypted.toHexString())
+            put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
+            put("type", "rsa")
+        }
 
         outputFile.writeText(json.toString())
     }
