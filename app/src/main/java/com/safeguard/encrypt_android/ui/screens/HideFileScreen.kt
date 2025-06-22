@@ -1,8 +1,10 @@
-// ui/screens/HideFileScreen.kt
 package com.safeguard.encrypt_android.ui.screens
 
 import android.content.Context
 import android.net.Uri
+import android.os.Environment
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
@@ -17,16 +19,21 @@ import java.io.File
 @Composable
 fun HideFileScreen() {
     val context = LocalContext.current
+
     var encryptedUri by remember { mutableStateOf<Uri?>(null) }
     var containerUri by remember { mutableStateOf<Uri?>(null) }
+    var encryptedName by remember { mutableStateOf("ninguno") }
+    var containerName by remember { mutableStateOf("ninguno") }
     var resultMessage by remember { mutableStateOf("") }
 
     val pickEncryptedFile = rememberLauncherForActivityResult(OpenDocument()) { uri ->
         encryptedUri = uri
+        encryptedName = uri?.let { getFileNameWithExtensionFromUri(context, it) } ?: "ninguno"
     }
 
     val pickContainerFile = rememberLauncherForActivityResult(OpenDocument()) { uri ->
         containerUri = uri
+        containerName = uri?.let { getFileNameWithExtensionFromUri(context, it) } ?: "ninguno"
     }
 
     Column(Modifier.padding(16.dp)) {
@@ -36,13 +43,13 @@ fun HideFileScreen() {
         Button(onClick = { pickEncryptedFile.launch(arrayOf("*/*")) }) {
             Text("Seleccionar archivo cifrado (.json)")
         }
-        Text("Archivo cifrado: ${encryptedUri?.lastPathSegment ?: "ninguno"}")
+        Text("Archivo cifrado: $encryptedName")
 
         Spacer(Modifier.height(12.dp))
         Button(onClick = { pickContainerFile.launch(arrayOf("*/*")) }) {
             Text("Seleccionar archivo contenedor")
         }
-        Text("Contenedor: ${containerUri?.lastPathSegment ?: "ninguno"}")
+        Text("Contenedor: $containerName")
 
         Spacer(Modifier.height(20.dp))
         Button(onClick = {
@@ -52,17 +59,22 @@ fun HideFileScreen() {
             }
 
             try {
-                val contInput = context.contentResolver.openInputStream(containerUri!!)!!
-                val contBytes = contInput.readBytes()
-                val cifInput = context.contentResolver.openInputStream(encryptedUri!!)!!
-                val cifBytes = cifInput.readBytes()
+                val contBytes = context.contentResolver.openInputStream(containerUri!!)!!.readBytes()
+                val cifBytes = context.contentResolver.openInputStream(encryptedUri!!)!!.readBytes()
 
-                val resultFile = File(context.cacheDir, "oculto.bin")
+                val outputDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Encrypt_Android"
+                ).apply { mkdirs() }
+
+                val resultFile = File(outputDir, containerName)
                 val delimiter = "<<--BETTY_START-->>".toByteArray()
+
                 resultFile.writeBytes(contBytes + delimiter + cifBytes)
 
                 resultMessage = "✅ Archivo oculto guardado en:\n${resultFile.absolutePath}"
                 Toast.makeText(context, "Ocultamiento exitoso", Toast.LENGTH_SHORT).show()
+
             } catch (e: Exception) {
                 resultMessage = "❌ Error: ${e.message}"
             }
@@ -73,4 +85,30 @@ fun HideFileScreen() {
         Spacer(Modifier.height(16.dp))
         Text(resultMessage, style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+// ✅ Función robusta para obtener nombre + extensión del archivo
+fun getFileNameWithExtensionFromUri(context: Context, uri: Uri): String {
+    val contentResolver = context.contentResolver
+    var name: String? = null
+    var extension: String? = null
+
+    val cursor = contentResolver.query(uri, null, null, null, null)
+    cursor?.use {
+        val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (it.moveToFirst() && nameIndex >= 0) {
+            name = it.getString(nameIndex)
+        }
+    }
+
+    if (name != null && !name.contains(".")) {
+        val type = contentResolver.getType(uri)
+        extension = MimeTypeMap.getSingleton()
+            .getExtensionFromMimeType(type ?: "")
+        if (extension != null) {
+            name += ".$extension"
+        }
+    }
+
+    return name ?: "archivo_oculto"
 }
