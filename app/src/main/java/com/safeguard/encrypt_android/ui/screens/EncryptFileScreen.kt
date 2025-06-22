@@ -126,13 +126,15 @@ fun EncryptFileScreen() {
 
                 CoroutineScope(Dispatchers.Main).launch {
                     try {
+                        val realName = getFileNameFromUri(context, inputUri!!) ?: "archivo.bin"
                         val inputFile = withContext(Dispatchers.IO) {
-                            File.createTempFile("input", null, context.cacheDir).apply {
+                            File(context.cacheDir, realName).apply {
                                 context.contentResolver.openInputStream(inputUri!!)?.use {
                                     writeBytes(it.readBytes())
                                 }
                             }
                         }
+
 
                         val encryptedFile = withContext(Dispatchers.IO) {
                             CryptoController.encrypt(
