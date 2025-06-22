@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ✅ Archivos cifrados/descifrados accesibles desde /Download/Encrypt_Android -->
+    <!-- Carpeta de descargas pública (Download/Encrypt_Android) -->
     <external-path
-        name="public_encrypted_files"
+        name="public_cyphered"
         path="Download/Encrypt_Android/" />
 
-    <!-- ✅ Llaves almacenadas en context.filesDir -->
+    <!-- Archivos cifrados internos de la app -->
+    <external-files-path
+        name="encrypted_files"
+        path="EncryptApp/" />
+
+    <!-- Llaves u otros en internal storage -->
     <files-path
         name="pem_files"
         path="." />

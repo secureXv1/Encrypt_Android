@@ -1,5 +1,6 @@
 package com.safeguard.encrypt_android.crypto
 
+import android.util.Base64
 import org.json.JSONObject
 import java.io.File
 import javax.crypto.Cipher
@@ -26,15 +27,9 @@ object Decryptor {
         val type = json.optString("type", "password")
         val filenameOriginal = json.optString("filename", "archivo" + ext)
 
-        val encryptedHex = when {
-            json.has("data") -> json.getString("data")
-            json.has("content") -> json.getString("content")
-            else -> throw IllegalArgumentException("❌ No se encontró campo 'data' ni 'content'")
-        }
+        val encryptedBytes = json.getString("data").hexToByteArray()
 
-        val encryptedBytes = encryptedHex.hexToByteArray()
-
-        val decryptedBytes = when (type) {
+        val decryptedBytes = when (type.lowercase()) {
             "rsa" -> {
                 if (privateKeyPEM.isNullOrBlank()) {
                     throw IllegalArgumentException("❌ Se requiere una clave privada para este archivo.")
@@ -48,35 +43,62 @@ object Decryptor {
                     privateKeyPEM
                 )
 
-                val secretKey = SecretKeySpec(aesKeyBytes, "AES")
-                val iv = ivHex.hexToByteArray()
-
                 val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
+                cipher.init(
+                    Cipher.DECRYPT_MODE,
+                    SecretKeySpec(aesKeyBytes, "AES"),
+                    IvParameterSpec(ivHex.hexToByteArray())
+                )
                 cipher.doFinal(encryptedBytes)
             }
 
             "password" -> {
                 val password = promptForPassword()
-                val keyIvCombined = json.getString("key_user").hexToByteArray()
-                val salt = keyIvCombined.sliceArray(0 until 16)
-                val iv = keyIvCombined.sliceArray(16 until 32)
 
-                val secretKey = CryptoUtils.deriveKeyFromPassword(password, salt)
+                try {
+                    // Intentar como usuario
+                    val saltUser = Base64.decode(json.getString("salt_user"), Base64.DEFAULT)
+                    val ivUser = json.getString("iv_user").hexToByteArray()
+                    val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser)
 
-                val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
-                cipher.doFinal(encryptedBytes)
+                    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                    cipher.init(Cipher.DECRYPT_MODE, keyUser, IvParameterSpec(ivUser))
+                    cipher.doFinal(encryptedBytes)
+
+                } catch (e: Exception) {
+                    // Intentar como administrador
+                    try {
+                        val saltAdmin = Base64.decode(json.getString("salt_admin"), Base64.DEFAULT)
+                        val ivAdmin = json.getString("iv_admin").hexToByteArray()
+                        val encryptedPasswordHex = json.getString("encrypted_user_password").hexToByteArray()
+
+                        val keyAdmin = CryptoUtils.deriveKeyFromPassword("SeguraAdmin123!", saltAdmin)
+
+                        val cipherAdmin = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                        cipherAdmin.init(Cipher.DECRYPT_MODE, keyAdmin, IvParameterSpec(ivAdmin))
+                        val recoveredPassword = cipherAdmin.doFinal(encryptedPasswordHex).toString(Charsets.UTF_8)
+
+                        // Reintentar con la contraseña del usuario real
+                        val saltUser = Base64.decode(json.getString("salt_user"), Base64.DEFAULT)
+                        val ivUser = json.getString("iv_user").hexToByteArray()
+                        val keyUser = CryptoUtils.deriveKeyFromPassword(recoveredPassword, saltUser)
+
+                        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                        cipher.init(Cipher.DECRYPT_MODE, keyUser, IvParameterSpec(ivUser))
+                        cipher.doFinal(encryptedBytes)
+
+                    } catch (ex: Exception) {
+                        throw IllegalArgumentException("❌ Contraseña incorrecta o archivo dañado.")
+                    }
+                }
             }
 
             else -> throw IllegalArgumentException("❌ Tipo de archivo cifrado desconocido: $type")
         }
 
-        // Agregar "_dec" al nombre original sin perder la extensión
         val filenameSinExt = filenameOriginal.substringBeforeLast(".")
         val extension = filenameOriginal.substringAfterLast(".", "")
         val nombreFinal = "${filenameSinExt}_dec.${extension}"
-
 
         return Pair(decryptedBytes, nombreFinal)
     }

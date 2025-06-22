@@ -14,11 +14,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.safeguard.encrypt_android.crypto.CryptoController
-import com.safeguard.encrypt_android.crypto.Encryptor
 import com.safeguard.encrypt_android.ui.components.PemFilePicker
 import com.safeguard.encrypt_android.utils.getFileNameFromUri
 import com.safeguard.encrypt_android.utils.openOutputFolder
 import java.io.File
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
 
 @Composable
 fun EncryptFileScreen() {
@@ -30,6 +35,7 @@ fun EncryptFileScreen() {
     var showPemPicker by remember { mutableStateOf(false) }
     var resultMessage by remember { mutableStateOf("") }
     var lastEncryptedFile by remember { mutableStateOf<File?>(null) }
+    var isEncrypting by remember { mutableStateOf(false) }
 
     val pickInputFile = rememberLauncherForActivityResult(OpenDocument()) { uri ->
         inputUri = uri
@@ -110,46 +116,62 @@ fun EncryptFileScreen() {
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = {
-                try {
-                    if (inputUri == null || method == null) {
-                        resultMessage = "⚠️ Selecciona archivo y método."
-                        return@Button
-                    }
+                if (inputUri == null || method == null) {
+                    resultMessage = "⚠️ Selecciona archivo y método."
+                    return@Button
+                }
 
-                    val inputFile = File.createTempFile("input", null, context.cacheDir).apply {
-                        context.contentResolver.openInputStream(inputUri!!)?.use {
-                            writeBytes(it.readBytes())
+                isEncrypting = true
+                resultMessage = ""
+
+                CoroutineScope(Dispatchers.Main).launch {
+                    try {
+                        val inputFile = withContext(Dispatchers.IO) {
+                            File.createTempFile("input", null, context.cacheDir).apply {
+                                context.contentResolver.openInputStream(inputUri!!)?.use {
+                                    writeBytes(it.readBytes())
+                                }
+                            }
                         }
+
+                        val encryptedFile = withContext(Dispatchers.IO) {
+                            CryptoController.encrypt(
+                                inputFile = inputFile,
+                                method = method!!,
+                                password = if (method == Encryptor.Metodo.PASSWORD) password else null,
+                                publicKeyPEM = if (method == Encryptor.Metodo.RSA) publicKeyPem else null
+                            )
+                        }
+
+                        lastEncryptedFile = encryptedFile
+                        resultMessage = "✅ Cifrado exitoso:\n${encryptedFile.absolutePath}"
+                        Toast.makeText(context, "Cifrado completado", Toast.LENGTH_SHORT).show()
+                        openOutputFolder(context, encryptedFile.parentFile!!)
+
+                    } catch (e: Exception) {
+                        resultMessage = "❌ Error: ${e.message}"
+                    } finally {
+                        isEncrypting = false
                     }
-
-                    val outputDir = File(context.getExternalFilesDir(null), "EncryptApp").apply {
-                        if (!exists()) mkdirs()
-                    }
-
-                    val originalName = getFileNameFromUri(context, inputUri!!)?.substringBeforeLast(".") ?: "archivo"
-                    val outputFile = File(outputDir, "${originalName}_Cif.json")
-
-                    val encryptedFile = CryptoController.encrypt(
-                        inputFile = inputFile,
-                        method = method!!,
-                        password = if (method == Encryptor.Metodo.PASSWORD) password else null,
-                        publicKeyPEM = if (method == Encryptor.Metodo.RSA) publicKeyPem else null
-                    )
-
-
-                    lastEncryptedFile = outputFile
-                    resultMessage = "✅ Cifrado exitoso:\n${outputFile.absolutePath}"
-                    Toast.makeText(context, "Cifrado completado", Toast.LENGTH_SHORT).show()
-                    openOutputFolder(context, outputFile.parentFile!!)
-
-                } catch (e: Exception) {
-                    resultMessage = "❌ Error: ${e.message}"
                 }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isEncrypting
         ) {
-            Text("🚀 CIFRAR")
+            if (isEncrypting) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .padding(end = 8.dp)
+                )
+                Text("Cifrando...")
+            } else {
+                Text("🚀 CIFRAR")
+            }
         }
+
 
         if (resultMessage.isNotBlank()) {
             Spacer(Modifier.height(16.dp))

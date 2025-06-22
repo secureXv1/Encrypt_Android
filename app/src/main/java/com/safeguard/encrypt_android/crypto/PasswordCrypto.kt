@@ -1,4 +1,3 @@
-// crypto/PasswordCrypto.kt
 package com.safeguard.encrypt_android.crypto
 
 import android.util.Base64
@@ -7,7 +6,6 @@ import java.io.File
 import java.security.SecureRandom
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
-import javax.crypto.Mac
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.SecretKeyFactory
 
@@ -15,7 +13,6 @@ object PasswordCrypto {
 
     private const val ITERATIONS = 100_000
     private const val KEY_LENGTH = 32
-
     private val masterPassword = "SeguraAdmin123!".toCharArray()
 
     fun generateSalt(): ByteArray {
@@ -27,7 +24,8 @@ object PasswordCrypto {
     fun deriveKey(password: CharArray, salt: ByteArray): SecretKey {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val spec = PBEKeySpec(password, salt, ITERATIONS, KEY_LENGTH * 8)
-        return SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
+        val key = factory.generateSecret(spec).encoded
+        return SecretKeySpec(key, "AES")
     }
 
     fun encryptFileWithPassword(inputFile: File, password: String, outputFile: File) {
@@ -41,21 +39,20 @@ object PasswordCrypto {
         )
         val serialized = originalPayload.toString().toByteArray()
 
-        // === Clave para el usuario ===
+        // === Usuario ===
         val saltUser = generateSalt()
         val keyUser = deriveKey(password.toCharArray(), saltUser)
-
         val encryptedData = AESUtils.encryptAES(serialized, keyUser)
 
-        // === Clave para el administrador ===
+        // === Admin ===
         val saltAdmin = generateSalt()
         val keyAdmin = deriveKey(masterPassword, saltAdmin)
-
         val encryptedPasswordBytes = AESUtils.encryptAES(password.toByteArray(), keyAdmin)
 
         // === Serializar salida ===
         val json = JSONObject(
             mapOf(
+                "type" to "password",
                 "salt_user" to Base64.encodeToString(saltUser, Base64.NO_WRAP),
                 "salt_admin" to Base64.encodeToString(saltAdmin, Base64.NO_WRAP),
                 "encrypted_user_password" to Base64.encodeToString(encryptedPasswordBytes, Base64.NO_WRAP),
@@ -84,16 +81,13 @@ object PasswordCrypto {
         val encryptedPasswordBytes = Base64.decode(json.getString("encrypted_user_password"), Base64.NO_WRAP)
         val encryptedData = Base64.decode(json.getString("data"), Base64.NO_WRAP)
 
-        var attempts = 0
-        while (attempts < 3) {
+        repeat(3) {
             val inputPassword = promptForPassword()
             val keyUser = deriveKey(inputPassword.toCharArray(), saltUser)
-
             try {
                 val decrypted = AESUtils.decryptAES(encryptedData, keyUser)
-                return PasswordDecryptionResult(decrypted) // ✅ Correcta
-            } catch (e: Exception) {
-                // Falló: intentamos como admin
+                return PasswordDecryptionResult(decrypted)
+            } catch (_: Exception) {
                 try {
                     val keyAdmin = deriveKey(adminPrivatePassword.toCharArray(), saltAdmin)
                     val recoveredPasswordBytes = AESUtils.decryptAES(encryptedPasswordBytes, keyAdmin)
@@ -102,8 +96,8 @@ object PasswordCrypto {
                     val keyUserReal = deriveKey(recoveredPassword.toCharArray(), saltUser)
                     val decrypted = AESUtils.decryptAES(encryptedData, keyUserReal)
                     return PasswordDecryptionResult(decrypted, recoveredPassword)
-                } catch (ex: Exception) {
-                    attempts++
+                } catch (_: Exception) {
+                    // Intento fallido, continúa
                 }
             }
         }

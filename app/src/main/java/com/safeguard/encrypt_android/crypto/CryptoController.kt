@@ -5,11 +5,6 @@ import java.io.File
 
 object CryptoController {
 
-    /**
-     * Cifra un archivo usando el método seleccionado.
-     * El archivo cifrado se guarda en Download/Encrypt_Android/nombre_cif.json
-     * Retorna el archivo generado.
-     */
     fun encrypt(
         inputFile: File,
         method: Encryptor.Metodo,
@@ -29,10 +24,6 @@ object CryptoController {
         }
     }
 
-    /**
-     * Descifra un archivo .json y lo guarda en Download/Encrypt_Android/nombre_dec.ext
-     * Retorna el archivo generado.
-     */
     fun decrypt(
         inputFile: File,
         promptForPassword: () -> String,
@@ -44,7 +35,10 @@ object CryptoController {
             privateKeyPEM = privateKeyPEM
         )
 
-        val outputDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android")
+        val outputDir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "Encrypt_Android"
+        )
         if (!outputDir.exists()) outputDir.mkdirs()
 
         val outputFile = File(outputDir, outputFileName)
