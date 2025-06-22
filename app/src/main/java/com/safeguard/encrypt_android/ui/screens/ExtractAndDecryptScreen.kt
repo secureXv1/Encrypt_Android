@@ -82,12 +82,12 @@ fun ExtractAndDecryptScreen() {
 
                 val outputFile = File(context.cacheDir, "descifrado_final")
 
-                CryptoController.decrypt(
+                val decryptedFile = CryptoController.decrypt(
                     inputFile = tempJsonFile,
-                    outputFile = outputFile,
                     promptForPassword = { password },
                     privateKeyPEM = if (privateKeyPem.isNotBlank()) privateKeyPem else null
                 )
+
 
                 message = "✅ Descifrado exitoso:\n${outputFile.absolutePath}"
                 Toast.makeText(context, "Archivo extraído y descifrado", Toast.LENGTH_SHORT).show()

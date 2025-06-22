@@ -104,12 +104,12 @@ fun DecryptScreen() {
 
                     val outputFile = File(outputDir, "${originalName}_Dec")
 
-                    CryptoController.decrypt(
+                    val decryptedFile = CryptoController.decrypt(
                         inputFile = tempInputFile,
-                        outputFile = outputFile,
                         promptForPassword = { password },
                         privateKeyPEM = if (privateKeyPem.isNotBlank()) privateKeyPem else null
                     )
+
 
                     resultMessage = "✅ Archivo descifrado:\n${outputFile.absolutePath}"
                     Toast.makeText(context, "Descifrado exitoso", Toast.LENGTH_SHORT).show()

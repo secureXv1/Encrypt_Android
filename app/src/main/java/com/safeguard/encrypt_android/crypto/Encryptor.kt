@@ -1,10 +1,10 @@
 package com.safeguard.encrypt_android.crypto
 
+import android.os.Environment
 import org.json.JSONObject
 import java.io.File
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 object Encryptor {
 
@@ -13,17 +13,16 @@ object Encryptor {
         RSA
     }
 
-    /**
-     * Convierte ByteArray a string hexadecimal.
-     */
     private fun ByteArray.toHexString(): String =
         joinToString("") { "%02x".format(it) }
 
-    /**
-     * Cifra un archivo con contraseña utilizando AES-CBC y derivación PBKDF2.
-     * Guarda la salida en formato HEX compatible con Windows (fromhex()).
-     */
-    fun encryptWithPassword(inputFile: File, password: String, outputFile: File) {
+    private fun getOutputFile(baseName: String): File {
+        val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android")
+        if (!dir.exists()) dir.mkdirs()
+        return File(dir, "${baseName}_cif.json")
+    }
+
+    fun encryptWithPassword(inputFile: File, password: String): File {
         val salt = CryptoUtils.generateRandomBytes(16)
         val iv = CryptoUtils.generateRandomBytes(16)
         val secretKey = CryptoUtils.deriveKeyFromPassword(password, salt)
@@ -36,18 +35,16 @@ object Encryptor {
             put("key_user", (salt + iv).toHexString())
             put("data", encrypted.toHexString())
             put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
+            put("filename", inputFile.name)
             put("type", "password")
         }
 
+        val outputFile = getOutputFile(inputFile.nameWithoutExtension)
         outputFile.writeText(json.toString())
+        return outputFile
     }
 
-    /**
-     * Cifra un archivo con clave pública del usuario y la clave pública maestra (admin).
-     * Los datos se cifran con AES-CBC y la clave AES se cifra con RSA.
-     * Todo se serializa en HEX para mantener compatibilidad con sistemas que usan .hex().
-     */
-    fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String, outputFile: File) {
+    fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String): File {
         val secretKey = CryptoUtils.generateAESKey()
         val iv = CryptoUtils.generateRandomBytes(16)
 
@@ -65,9 +62,12 @@ object Encryptor {
             put("iv", iv.toHexString())
             put("data", encrypted.toHexString())
             put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
+            put("filename", inputFile.name)
             put("type", "rsa")
         }
 
+        val outputFile = getOutputFile(inputFile.nameWithoutExtension)
         outputFile.writeText(json.toString())
+        return outputFile
     }
 }

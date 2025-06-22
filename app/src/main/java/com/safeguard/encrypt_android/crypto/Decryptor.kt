@@ -24,6 +24,7 @@ object Decryptor {
         val json = JSONObject(inputFile.readText())
         val ext = json.optString("ext", ".bin")
         val type = json.optString("type", "password")
+        val filenameOriginal = json.optString("filename", "archivo" + ext)
 
         val encryptedHex = when {
             json.has("data") -> json.getString("data")
@@ -33,7 +34,7 @@ object Decryptor {
 
         val encryptedBytes = encryptedHex.hexToByteArray()
 
-        return when (type) {
+        val decryptedBytes = when (type) {
             "rsa" -> {
                 if (privateKeyPEM.isNullOrBlank()) {
                     throw IllegalArgumentException("❌ Se requiere una clave privada para este archivo.")
@@ -52,9 +53,7 @@ object Decryptor {
 
                 val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
                 cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
-                val decrypted = cipher.doFinal(encryptedBytes)
-
-                Pair(decrypted, ext)
+                cipher.doFinal(encryptedBytes)
             }
 
             "password" -> {
@@ -67,12 +66,18 @@ object Decryptor {
 
                 val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
                 cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
-                val decrypted = cipher.doFinal(encryptedBytes)
-
-                Pair(decrypted, ext)
+                cipher.doFinal(encryptedBytes)
             }
 
             else -> throw IllegalArgumentException("❌ Tipo de archivo cifrado desconocido: $type")
         }
+
+        // Agregar "_dec" al nombre original sin perder la extensión
+        val filenameSinExt = filenameOriginal.substringBeforeLast(".")
+        val extension = filenameOriginal.substringAfterLast(".", "")
+        val nombreFinal = "${filenameSinExt}_dec.${extension}"
+
+
+        return Pair(decryptedBytes, nombreFinal)
     }
 }

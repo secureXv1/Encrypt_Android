@@ -129,13 +129,13 @@ fun EncryptFileScreen() {
                     val originalName = getFileNameFromUri(context, inputUri!!)?.substringBeforeLast(".") ?: "archivo"
                     val outputFile = File(outputDir, "${originalName}_Cif.json")
 
-                    CryptoController.encrypt(
+                    val encryptedFile = CryptoController.encrypt(
                         inputFile = inputFile,
                         method = method!!,
-                        outputFile = outputFile,
                         password = if (method == Encryptor.Metodo.PASSWORD) password else null,
                         publicKeyPEM = if (method == Encryptor.Metodo.RSA) publicKeyPem else null
                     )
+
 
                     lastEncryptedFile = outputFile
                     resultMessage = "✅ Cifrado exitoso:\n${outputFile.absolutePath}"

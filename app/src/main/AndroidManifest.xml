@@ -1,12 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.safeguard.endcrypt_android"> <!-- ✅ Agrega esto si no lo tenías -->
+    package="com.safeguard.endcrypt_android">
 
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- ✅ Permisos para acceso al almacenamiento en Android 10 o inferior -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+
+    <!-- ✅ Permiso adicional para Android 11+ (si decides usar acceso completo) -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <!-- ✅ Para conexión de red -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -20,7 +27,7 @@
         android:theme="@style/Theme.Encrypt_Android"
         tools:targetApi="31">
 
-        <!-- ✅ FileProvider con package name explícito -->
+        <!-- ✅ FileProvider correctamente configurado -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.safeguard.endcrypt_android.provider"
@@ -42,5 +49,4 @@
             </intent-filter>
         </activity>
     </application>
-
 </manifest>
