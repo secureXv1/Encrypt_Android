@@ -131,7 +131,7 @@ fun MainScreen() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable("home") { HomeScreen() }
-            composable("encrypt") { EncryptScreen(navController) }
+            composable("encrypt") { EncryptScreen() }
             composable("tunnel") { TunnelScreen(navController) }
 
             composable("keygen") { KeygenScreen() }
