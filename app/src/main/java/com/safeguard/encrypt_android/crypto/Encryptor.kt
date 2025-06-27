@@ -21,7 +21,8 @@ object Encryptor {
         val originalName = inputFile.name.substringBeforeLast('.') // Nombre sin extensión real
         val fileName = "${originalName}_Cif.json"
 
-        val publicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android")
+        val publicDir = File(MyApp.context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android")
+
         val privateDir = File(MyApp.context.getExternalFilesDir(null), "EncryptApp")
 
         if (!publicDir.exists()) publicDir.mkdirs()
@@ -66,11 +67,17 @@ object Encryptor {
         }
 
         val (publicFile, privateFile) = getOutputFilesFrom(inputFile)
+
+        // ✅ Refuerzo de seguridad de escritura
+        publicFile.parentFile?.mkdirs()
+        privateFile.parentFile?.mkdirs()
+
         publicFile.writeText(json.toString())
         privateFile.writeText(json.toString())
 
         return publicFile
     }
+
 
     fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String): File {
         val secretKey = CryptoUtils.generateAESKey()
@@ -94,9 +101,15 @@ object Encryptor {
         }
 
         val (publicFile, privateFile) = getOutputFilesFrom(inputFile)
+
+        // ✅ Refuerzo: asegúrate que las carpetas existen
+        publicFile.parentFile?.mkdirs()
+        privateFile.parentFile?.mkdirs()
+
         publicFile.writeText(json.toString())
         privateFile.writeText(json.toString())
 
         return publicFile
     }
+
 }

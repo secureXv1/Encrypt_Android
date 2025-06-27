@@ -30,47 +30,34 @@ enum class EncryptMenuOption(val title: String, val icon: ImageVector) {
 @Composable
 fun EncryptScreen() {
     var selected by remember { mutableStateOf(EncryptMenuOption.ENCRYPT) }
-    var isExpanded by remember { mutableStateOf(true) }
 
     Row(modifier = Modifier.fillMaxSize()) {
 
-        // Menú lateral colapsable
+        // Menú lateral fijo (solo íconos y texto abajo)
         Column(
             modifier = Modifier
-                .width(if (isExpanded) 160.dp else 72.dp)
+                .width(72.dp)
                 .fillMaxHeight()
                 .background(Color(0xFF2C2C2C)),
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            IconButton(onClick = { isExpanded = !isExpanded }) {
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.ChevronLeft else Icons.Default.Menu,
-                    contentDescription = "Toggle",
-                    tint = Color.White
-                )
-
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             EncryptMenuOption.values().forEach { option ->
                 val isSelected = selected == option
-                MenuIconTile(
+                MenuIconTileCompact(
                     title = option.title,
                     icon = option.icon,
-                    selected = isSelected,
-                    isExpanded = isExpanded
+                    selected = isSelected
                 ) {
                     selected = option
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
 
-        // Contenido principal
+        // Contenido principal a la derecha
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -87,12 +74,12 @@ fun EncryptScreen() {
 }
 
 
+
 @Composable
-fun MenuIconTile(
+fun MenuIconTileCompact(
     title: String,
     icon: ImageVector,
     selected: Boolean,
-    isExpanded: Boolean,
     onClick: () -> Unit
 ) {
     val bgColor = if (selected) Color(0xFF00BCD4) else Color(0xFF1E1E1E)
@@ -100,11 +87,13 @@ fun MenuIconTile(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(horizontal = 4.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(64.dp)
+                .size(48.dp)
                 .background(bgColor, RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
@@ -112,13 +101,16 @@ fun MenuIconTile(
                 imageVector = icon,
                 contentDescription = title,
                 tint = contentColor,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
-        if (isExpanded) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(title, color = contentColor, style = MaterialTheme.typography.labelSmall)
-        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = title.take(6), // si quieres limitarlo visualmente
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall
+        )
     }
 }
+
 
