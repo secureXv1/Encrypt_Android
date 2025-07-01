@@ -39,19 +39,71 @@ fun KeygenScreen() {
     var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
     var fileToDelete by remember { mutableStateOf<File?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showOverwriteDialog by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
 
     // Importar archivo .pem
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        uri?.let {
-            val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "imported_key.pem"
-            val destFile = File(context.filesDir, fileName)
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                destFile.writeBytes(input.readBytes())
-                Toast.makeText(context, "Llave importada: ${destFile.name}", Toast.LENGTH_SHORT).show()
-            }
-            pemFiles = context.filesDir.listFiles()?.filter { it.name.endsWith(".pem") }?.sortedBy { it.name } ?: emptyList()
+    var renameData by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+
+    fun getDisplayNameFromUri(context: Context, uri: Uri): String? {
+        val cursor = context.contentResolver.query(uri, null, null, null, null)
+        return cursor?.use {
+            val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            if (it.moveToFirst() && nameIndex != -1) it.getString(nameIndex) else null
         }
     }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri?.let {
+            val inputBytes = context.contentResolver.openInputStream(uri)?.readBytes()
+            val content = inputBytes?.toString(Charsets.UTF_8)
+
+            if (content != null) {
+                val type = when {
+                    content.contains("-----BEGIN PUBLIC KEY-----") -> "public"
+                    content.contains("-----BEGIN PRIVATE KEY-----") -> "private"
+                    else -> {
+                        Toast.makeText(context, "❌ El archivo no contiene una llave válida", Toast.LENGTH_LONG).show()
+                        return@let
+                    }
+                }
+
+                val fullName = getDisplayNameFromUri(context, uri) ?: "imported_key.pem"
+                val originalName = fullName
+                    .removeSuffix(".pem")
+                    .removeSuffix("_public")
+                    .removeSuffix("_private")
+
+                renameData = Triple(originalName, type, content)
+            } else {
+                Toast.makeText(context, "❌ No se pudo leer el archivo", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    renameData?.let { (defaultName, type, content) ->
+        showRenameDialog(
+            context = context,
+            defaultName = defaultName,
+            type = type,
+            content = content,
+            onSaved = { finalName ->
+                val file = File(context.filesDir, "${finalName}_${type}.pem")
+                if (file.exists()) {
+                    Toast.makeText(context, "⚠️ Ya existe una llave con ese nombre", Toast.LENGTH_LONG).show()
+                } else {
+                    file.writeText(content)
+                    Toast.makeText(context, "✔️ Llave importada como: ${file.name}", Toast.LENGTH_SHORT).show()
+                    pemFiles = context.filesDir.listFiles()?.filter { it.name.endsWith(".pem") }?.sortedBy { it.name } ?: emptyList()
+                }
+                renameData = null
+            },
+            onDismiss = {
+                renameData = null
+            }
+        )
+    }
+
+
 
     // Cargar llaves al iniciar
     LaunchedEffect(Unit) {
@@ -89,7 +141,31 @@ fun KeygenScreen() {
                     showCreateDialog = false
                     pemFiles = context.filesDir.listFiles()?.filter { it.name.endsWith(".pem") }?.sortedBy { it.name } ?: emptyList()
                 },
-                onDismiss = { showCreateDialog = false }
+                onDismiss = { showCreateDialog = false },
+                showOverwriteDialog = { showOverwriteDialog = it }
+            )
+        }
+
+        // Diálogo de sobreescritura
+        showOverwriteDialog?.let { (fileName, onConfirm) ->
+            AlertDialog(
+                onDismissRequest = { showOverwriteDialog = null },
+                title = { Text("Archivo existente") },
+                text = { Text("Ya existe una llave llamada $fileName. ¿Deseas sobrescribirla?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onConfirm()
+                        showOverwriteDialog = null
+                    }) {
+                        Text("Sobrescribir")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showOverwriteDialog = null }) {
+                        Text("Cancelar")
+                    }
+                },
+                containerColor = Color(0xFF1E1E1E)
             )
         }
 
@@ -168,7 +244,6 @@ fun KeygenScreen() {
     }
 }
 
-
 fun wrapAsPem(base64: String, label: String): String {
     return buildString {
         appendLine("-----BEGIN $label-----")
@@ -195,7 +270,8 @@ fun sharePemFile(context: Context, file: File) {
 fun CrearLlaveDialog(
     context: Context,
     onLlaveCreada: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    showOverwriteDialog: ((Pair<String, () -> Unit>) -> Unit)
 ) {
     var nombreLlave by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -224,15 +300,24 @@ fun CrearLlaveDialog(
                     return@TextButton
                 }
 
-                try {
+                val pubFile = File(context.filesDir, "${nombreLlave}_public.pem")
+                val privFile = File(context.filesDir, "${nombreLlave}_private.pem")
+
+                val saveKeyPair: () -> Unit = {
                     val keyPair = KeyUtils.generateRSAKeyPair()
                     val pubPem = wrapAsPem(KeyUtils.encodePublicKeyToBase64(keyPair.public), "PUBLIC KEY")
                     val privPem = wrapAsPem(KeyUtils.encodePrivateKeyToBase64(keyPair.private), "PRIVATE KEY")
-                    File(context.filesDir, "${nombreLlave}_public.pem").writeText(pubPem)
-                    File(context.filesDir, "${nombreLlave}_private.pem").writeText(privPem)
+                    pubFile.writeText(pubPem)
+                    privFile.writeText(privPem)
                     onLlaveCreada()
-                } catch (e: Exception) {
-                    error = "Error al generar llave: ${e.message}"
+                }
+
+                if (pubFile.exists() || privFile.exists()) {
+                    showOverwriteDialog(pubFile.name to saveKeyPair)
+                    onDismiss()
+                } else {
+                    saveKeyPair()
+                    onDismiss()
                 }
             }) {
                 Text("Crear")
@@ -246,4 +331,54 @@ fun CrearLlaveDialog(
         containerColor = Color(0xFF1E1E1E)
     )
 }
+
+@Composable
+fun showRenameDialog(
+    context: Context,
+    defaultName: String,
+    type: String,
+    content: String,
+    onSaved: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf(defaultName) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Renombrar llave") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre de la llave") },
+                    singleLine = true
+                )
+                if (error != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(error!!, color = Color.Red)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (name.isBlank()) {
+                    error = "El nombre no puede estar vacío"
+                    return@TextButton
+                }
+                onSaved(name)
+            }) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        },
+        containerColor = Color(0xFF1E1E1E)
+    )
+}
+
 
