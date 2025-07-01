@@ -18,21 +18,33 @@ object Encryptor {
         joinToString("") { "%02x".format(it) }
 
     private fun getOutputFilesFrom(inputFile: File): Pair<File, File> {
-        val originalName = inputFile.name.substringBeforeLast('.') // Nombre sin extensión real
+        // ✅ Obtener nombre base del archivo (sin extensión)
+        val originalName = inputFile.nameWithoutExtension
         val fileName = "${originalName}_Cif.json"
 
-        val publicDir = File(MyApp.context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android")
+        // ✅ Carpeta pública (visible al usuario)
+        val publicDir = File(
+            MyApp.context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+            "Encrypt_Android"
+        )
 
-        val privateDir = File(MyApp.context.getExternalFilesDir(null), "EncryptApp")
+        // ✅ Carpeta privada (oculta al usuario)
+        val privateDir = File(
+            MyApp.context.getExternalFilesDir(null),
+            "EncryptApp"
+        )
 
+        // Crear carpetas si no existen
         if (!publicDir.exists()) publicDir.mkdirs()
         if (!privateDir.exists()) privateDir.mkdirs()
 
+        // Devolver archivos con rutas correctas
         return Pair(
             File(publicDir, fileName),
             File(privateDir, fileName)
         )
     }
+
 
 
     fun encryptWithPassword(inputFile: File, password: String): File {
