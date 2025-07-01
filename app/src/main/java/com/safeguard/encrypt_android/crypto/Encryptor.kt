@@ -30,7 +30,7 @@ object Encryptor {
 
         // ✅ Carpeta privada (oculta al usuario)
         val privateDir = File(
-            MyApp.context.getExternalFilesDir(null),
+            MyApp.context.filesDir,
             "EncryptApp"
         )
 
