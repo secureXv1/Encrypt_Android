@@ -8,8 +8,8 @@
 
     <!-- Archivos cifrados internos de la app -->
     <external-files-path
-        name="encrypted_files"
-        path="EncryptApp/" />
+        name="public_cyphered"
+        path="Download/Encrypt_Android/" />
 
     <!-- Llaves u otros en internal storage -->
     <files-path

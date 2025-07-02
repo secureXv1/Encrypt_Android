@@ -9,17 +9,18 @@ object CryptoController {
         inputFile: File,
         method: Encryptor.Metodo,
         password: String? = null,
-        publicKeyPEM: String? = null
+        publicKeyPEM: String? = null,
+        userUuid: String
     ): File {
         return when (method) {
             Encryptor.Metodo.PASSWORD -> {
                 require(!password.isNullOrBlank()) { "Se requiere una contraseña válida." }
-                Encryptor.encryptWithPassword(inputFile, password)
+                Encryptor.encryptWithPassword(inputFile, password, userUuid)
             }
 
             Encryptor.Metodo.RSA -> {
                 require(!publicKeyPEM.isNullOrBlank()) { "Se requiere una clave pública válida." }
-                Encryptor.encryptWithPublicKey(inputFile, publicKeyPEM)
+                Encryptor.encryptWithPublicKey(inputFile, publicKeyPEM, userUuid)
             }
         }
     }

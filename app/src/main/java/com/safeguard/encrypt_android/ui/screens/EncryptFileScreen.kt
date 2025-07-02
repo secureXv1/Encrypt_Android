@@ -9,7 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
@@ -26,6 +28,8 @@ import com.safeguard.encrypt_android.ui.components.PemFilePicker
 import com.safeguard.encrypt_android.utils.getFileNameFromUri
 import java.io.File
 import kotlinx.coroutines.*
+import android.content.Context
+
 
 @Composable
 fun EncryptFileScreen() {
@@ -39,6 +43,12 @@ fun EncryptFileScreen() {
     var keyFiles by remember { mutableStateOf(listOf<File>()) }
     var selectedKeyFile by remember { mutableStateOf<File?>(null) }
 
+    var encryptedFile by remember { mutableStateOf<File?>(null) }
+    var hiddenFile by remember { mutableStateOf<File?>(null) }
+    var resumenCifrado by remember { mutableStateOf<String?>(null) }
+
+    val scrollState = rememberScrollState()
+
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         selectedFileUri = uri
         selectedFileName = uri?.lastPathSegment?.substringAfterLast('/') ?: ""
@@ -51,6 +61,7 @@ fun EncryptFileScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .background(Color(0xFF0F1B1E))
             .padding(horizontal = 20.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -163,6 +174,14 @@ fun EncryptFileScreen() {
                 } else if (encryptionMethod == null) {
                     Toast.makeText(context, "❌ Método de cifrado no seleccionado", Toast.LENGTH_SHORT).show()
                 } else {
+                    val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+                    val userUuid = prefs.getString("user_uuid", null)
+
+                    if (userUuid.isNullOrBlank()) {
+                        Toast.makeText(context, "❌ No se encontró el UUID del usuario", Toast.LENGTH_LONG).show()
+                        return@Button
+                    }
+
                     val inputStream = context.contentResolver.openInputStream(selectedFileUri!!)
                     val fileBytes = inputStream?.readBytes()
                     val fileName = getFileNameFromUri(context, selectedFileUri!!)
@@ -179,7 +198,7 @@ fun EncryptFileScreen() {
                                     null
                                 } else {
                                     try {
-                                        Encryptor.encryptWithPassword(originalFile, password)
+                                        Encryptor.encryptWithPassword(originalFile, password, userUuid)
                                     } catch (e: Exception) {
                                         Toast.makeText(context, "❌ Error al cifrar: ${e.message}", Toast.LENGTH_LONG).show()
                                         null
@@ -194,7 +213,7 @@ fun EncryptFileScreen() {
                                 } else {
                                     try {
                                         val pem = selectedKeyFile!!.readText()
-                                        Encryptor.encryptWithPublicKey(originalFile, pem)
+                                        Encryptor.encryptWithPublicKey(originalFile, pem, userUuid)
                                     } catch (e: Exception) {
                                         Toast.makeText(context, "❌ Error al cifrar: ${e.message}", Toast.LENGTH_LONG).show()
                                         null
@@ -206,11 +225,18 @@ fun EncryptFileScreen() {
                         }
 
                         if (resultFile != null) {
-                            // Guardar también en la carpeta pública
-                            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                            val outputDir = File(downloadsDir, "Encrypt_Android").apply { mkdirs() }
+                            encryptedFile = resultFile
+                            hiddenFile = null
+                            resumenCifrado = when (encryptionMethod) {
+                                Encryptor.Metodo.PASSWORD -> "🔒 Cifrado con contraseña"
+                                Encryptor.Metodo.RSA -> "🔑 Cifrado con llave ${selectedKeyFile?.name}"
+                                else -> null
+                            }
+
+                            val outputDir = File(context.getExternalFilesDir("Download/Encrypt_Android")!!, "").apply { mkdirs() }
                             val outputFile = File(outputDir, resultFile.name)
                             outputFile.writeText(resultFile.readText())
+
 
                             Toast.makeText(context, "✔️ Archivo cifrado guardado en: ${outputFile.name}", Toast.LENGTH_LONG).show()
                         }
@@ -225,8 +251,73 @@ fun EncryptFileScreen() {
             Spacer(Modifier.width(8.dp))
             Text("CIFRAR", color = Color.Black)
         }
+
+        if (resumenCifrado != null && encryptedFile != null) {
+            Spacer(Modifier.height(24.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2A2D)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("✅ Cifrado exitoso", color = Color.White, fontSize = 16.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text(resumenCifrado!!, color = Color.LightGray, fontSize = 14.sp)
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Button(onClick = {
+                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", encryptedFile!!)
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "application/json"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Compartir archivo cifrado"))
+                        }) {
+                            Text("📤 Compartir")
+                        }
+
+                        Button(onClick = {
+                            val container = File(context.filesDir, "imagen.jpg")
+                            if (!container.exists()) {
+                                Toast.makeText(context, "⚠️ Contenedor no encontrado", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            val hidden = File(context.cacheDir, "oculto_${encryptedFile!!.name}")
+                            val delimiter = ":::ENCRYPTED:::"
+                            hidden.writeBytes(container.readBytes() + delimiter.toByteArray() + encryptedFile!!.readBytes())
+                            hiddenFile = hidden
+                            Toast.makeText(context, "✔️ Archivo oculto generado", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Text("🫙 Ocultar")
+                        }
+                    }
+                }
+            }
+        }
+
+        if (hiddenFile != null) {
+            Spacer(Modifier.height(20.dp))
+            Text("📦 Archivo oculto listo para compartir:", color = Color.White)
+            FilePreview(fileName = hiddenFile!!.name, file = hiddenFile!!) {
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", hiddenFile!!)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "*/*"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "Compartir archivo oculto"))
+            }
+        }
     }
 }
+
+
 
 
 @Composable

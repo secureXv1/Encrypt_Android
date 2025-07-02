@@ -27,6 +27,9 @@ object Decryptor {
         val type = json.optString("type", "password")
         val filenameOriginal = json.optString("filename", "archivo" + ext)
 
+        // 🔹 Lectura opcional del campo created_by (no se usa por ahora)
+        val createdBy = json.optString("created_by", null)
+
         val encryptedBytes = json.getString("data").hexToByteArray()
 
         val decryptedBytes = when (type.lowercase()) {
@@ -102,4 +105,5 @@ object Decryptor {
 
         return Pair(decryptedBytes, nombreFinal)
     }
+
 }

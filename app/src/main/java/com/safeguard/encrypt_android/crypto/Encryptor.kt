@@ -47,7 +47,7 @@ object Encryptor {
 
 
 
-    fun encryptWithPassword(inputFile: File, password: String): File {
+    fun encryptWithPassword(inputFile: File, password: String, userUuid: String): File {
         val saltUser = CryptoUtils.generateRandomBytes(16)
         val saltAdmin = CryptoUtils.generateRandomBytes(16)
         val ivUser = CryptoUtils.generateRandomBytes(16)
@@ -76,6 +76,7 @@ object Encryptor {
             put("iv_admin", ivAdmin.toHexString())
             put("data", encryptedContent.toHexString())
             put("encrypted_user_password", encryptedPassword.toHexString())
+            put("created_by", userUuid)
         }
 
         val (publicFile, privateFile) = getOutputFilesFrom(inputFile)
@@ -91,7 +92,7 @@ object Encryptor {
     }
 
 
-    fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String): File {
+    fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String, userUuid: String): File {
         val secretKey = CryptoUtils.generateAESKey()
         val iv = CryptoUtils.generateRandomBytes(16)
 
@@ -110,6 +111,7 @@ object Encryptor {
             put("key_master", encryptedKeyMaster.toHexString())
             put("iv", iv.toHexString())
             put("data", encrypted.toHexString())
+            put("created_by", userUuid)
         }
 
         val (publicFile, privateFile) = getOutputFilesFrom(inputFile)
