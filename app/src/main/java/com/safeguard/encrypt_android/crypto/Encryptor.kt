@@ -6,6 +6,9 @@ import org.json.JSONObject
 import java.io.File
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.GCMParameterSpec
+import android.util.Base64
+
 
 object Encryptor {
 
@@ -47,6 +50,7 @@ object Encryptor {
 
 
 
+
     fun encryptWithPassword(inputFile: File, password: String, userUuid: String): File {
         val saltUser = CryptoUtils.generateRandomBytes(16)
         val saltAdmin = CryptoUtils.generateRandomBytes(16)
@@ -56,22 +60,24 @@ object Encryptor {
         val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser)
         val keyAdmin = CryptoUtils.deriveKeyFromPassword("SeguraAdmin123!", saltAdmin)
 
-        // Cifrar contenido con clave del usuario
-        val cipherUser = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipherUser.init(Cipher.ENCRYPT_MODE, keyUser, IvParameterSpec(ivUser))
+        // ✅ Cifrar contenido con clave del usuario (AES-GCM)
+        val cipherUser = Cipher.getInstance("AES/GCM/NoPadding")
+        val specUser = GCMParameterSpec(128, ivUser)
+        cipherUser.init(Cipher.ENCRYPT_MODE, keyUser, specUser)
         val encryptedContent = cipherUser.doFinal(inputFile.readBytes())
 
-        // Cifrar la contraseña con clave del admin
-        val cipherAdmin = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipherAdmin.init(Cipher.ENCRYPT_MODE, keyAdmin, IvParameterSpec(ivAdmin))
+        // ✅ Cifrar la contraseña con clave del admin (AES-GCM)
+        val cipherAdmin = Cipher.getInstance("AES/GCM/NoPadding")
+        val specAdmin = GCMParameterSpec(128, ivAdmin)
+        cipherAdmin.init(Cipher.ENCRYPT_MODE, keyAdmin, specAdmin)
         val encryptedPassword = cipherAdmin.doFinal(password.toByteArray(Charsets.UTF_8))
 
         val json = JSONObject().apply {
             put("type", "password")
             put("filename", inputFile.name)
             put("ext", inputFile.extension.let { if (it.startsWith(".")) it else ".$it" })
-            put("salt_user", android.util.Base64.encodeToString(saltUser, android.util.Base64.NO_WRAP))
-            put("salt_admin", android.util.Base64.encodeToString(saltAdmin, android.util.Base64.NO_WRAP))
+            put("salt_user", Base64.encodeToString(saltUser, Base64.NO_WRAP))
+            put("salt_admin", Base64.encodeToString(saltAdmin, Base64.NO_WRAP))
             put("iv_user", ivUser.toHexString())
             put("iv_admin", ivAdmin.toHexString())
             put("data", encryptedContent.toHexString())
@@ -80,8 +86,6 @@ object Encryptor {
         }
 
         val (publicFile, privateFile) = getOutputFilesFrom(inputFile)
-
-        // ✅ Refuerzo de seguridad de escritura
         publicFile.parentFile?.mkdirs()
         privateFile.parentFile?.mkdirs()
 
@@ -97,8 +101,9 @@ object Encryptor {
         val secretKey = CryptoUtils.generateAESKey()
         val iv = CryptoUtils.generateRandomBytes(16)
 
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, IvParameterSpec(iv))
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val spec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, spec)
         val encrypted = cipher.doFinal(inputFile.readBytes())
 
         val encryptedKeyUser = CryptoUtils.encryptKeyWithPublicKey(secretKey.encoded, publicKeyPEM)
@@ -116,8 +121,6 @@ object Encryptor {
         }
 
         val (publicFile, privateFile) = getOutputFilesFrom(inputFile)
-
-        // ✅ Refuerzo: asegúrate que las carpetas existen
         publicFile.parentFile?.mkdirs()
         privateFile.parentFile?.mkdirs()
 
@@ -127,6 +130,7 @@ object Encryptor {
 
         return publicFile
     }
+
 
     private fun saveCopyToDatFolder(fileName: String, content: String) {
         val datDir = File(MyApp.context.filesDir, "Encrypt_Android/dat")

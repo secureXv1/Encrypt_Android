@@ -124,7 +124,7 @@ fun EncryptFileScreen() {
                 }
                 .padding(padding)
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
+
         ) {
             OutlinedTextField(
                 value = searchQuery,
@@ -406,6 +406,7 @@ fun SwipeableFileItemV2(
 
     Box(
         modifier = Modifier
+            .padding(horizontal = 12.dp) // ✅ Padding local, no global
             .fillMaxWidth()
             .height(70.dp)
             .pointerInput(Unit) {
@@ -458,7 +459,7 @@ fun SwipeableFileItemV2(
                 Text(file.name, color = Color.White, fontSize = 16.sp, maxLines = 1)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "📅 Modificado: ${
+                    "${
                         SimpleDateFormat("dd/MM/yyyy, HH:mm", Locale.getDefault()).format(file.lastModified())
                     }",
                     color = Color.LightGray,

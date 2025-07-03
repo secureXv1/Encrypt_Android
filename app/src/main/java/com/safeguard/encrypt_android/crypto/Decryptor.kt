@@ -4,7 +4,7 @@ import android.util.Base64
 import org.json.JSONObject
 import java.io.File
 import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 object Decryptor {
@@ -27,9 +27,6 @@ object Decryptor {
         val type = json.optString("type", "password")
         val filenameOriginal = json.optString("filename", "archivo" + ext)
 
-        // 🔹 Lectura opcional del campo created_by (no se usa por ahora)
-        val createdBy = json.optString("created_by", null)
-
         val encryptedBytes = json.getString("data").hexToByteArray()
 
         val decryptedBytes = when (type.lowercase()) {
@@ -46,11 +43,12 @@ object Decryptor {
                     privateKeyPEM
                 )
 
-                val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                val spec = GCMParameterSpec(128, ivHex.hexToByteArray())
                 cipher.init(
                     Cipher.DECRYPT_MODE,
                     SecretKeySpec(aesKeyBytes, "AES"),
-                    IvParameterSpec(ivHex.hexToByteArray())
+                    spec
                 )
                 cipher.doFinal(encryptedBytes)
             }
@@ -64,8 +62,9 @@ object Decryptor {
                     val ivUser = json.getString("iv_user").hexToByteArray()
                     val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser)
 
-                    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                    cipher.init(Cipher.DECRYPT_MODE, keyUser, IvParameterSpec(ivUser))
+                    val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                    val spec = GCMParameterSpec(128, ivUser)
+                    cipher.init(Cipher.DECRYPT_MODE, keyUser, spec)
                     cipher.doFinal(encryptedBytes)
 
                 } catch (e: Exception) {
@@ -77,8 +76,9 @@ object Decryptor {
 
                         val keyAdmin = CryptoUtils.deriveKeyFromPassword("SeguraAdmin123!", saltAdmin)
 
-                        val cipherAdmin = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                        cipherAdmin.init(Cipher.DECRYPT_MODE, keyAdmin, IvParameterSpec(ivAdmin))
+                        val cipherAdmin = Cipher.getInstance("AES/GCM/NoPadding")
+                        val specAdmin = GCMParameterSpec(128, ivAdmin)
+                        cipherAdmin.init(Cipher.DECRYPT_MODE, keyAdmin, specAdmin)
                         val recoveredPassword = cipherAdmin.doFinal(encryptedPasswordHex).toString(Charsets.UTF_8)
 
                         // Reintentar con la contraseña del usuario real
@@ -86,8 +86,9 @@ object Decryptor {
                         val ivUser = json.getString("iv_user").hexToByteArray()
                         val keyUser = CryptoUtils.deriveKeyFromPassword(recoveredPassword, saltUser)
 
-                        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                        cipher.init(Cipher.DECRYPT_MODE, keyUser, IvParameterSpec(ivUser))
+                        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                        val spec = GCMParameterSpec(128, ivUser)
+                        cipher.init(Cipher.DECRYPT_MODE, keyUser, spec)
                         cipher.doFinal(encryptedBytes)
 
                     } catch (ex: Exception) {

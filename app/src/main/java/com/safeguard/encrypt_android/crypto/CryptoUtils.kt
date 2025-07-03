@@ -5,27 +5,25 @@ import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import javax.crypto.*
+import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 object CryptoUtils {
 
-    // Genera una clave AES aleatoria (256 bits)
     fun generateAESKey(): SecretKey {
         val keyGen = KeyGenerator.getInstance("AES")
-        keyGen.init(256) // Cambiar a 128 si el dispositivo no soporta 256
+        keyGen.init(256)
         return keyGen.generateKey()
     }
 
-    // Genera un arreglo de bytes aleatorios (usado para IVs o salt)
     fun generateRandomBytes(size: Int): ByteArray {
         val bytes = ByteArray(size)
         SecureRandom().nextBytes(bytes)
         return bytes
     }
 
-    // Deriva una clave AES a partir de una contraseña + salt usando PBKDF2
     fun deriveKeyFromPassword(password: String, salt: ByteArray): SecretKey {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val spec = PBEKeySpec(password.toCharArray(), salt, 65536, 256)
@@ -33,7 +31,20 @@ object CryptoUtils {
         return SecretKeySpec(secret.encoded, "AES")
     }
 
-    // Cifra una clave AES con una clave pública RSA
+    // ✅ NUEVO: Descifrado con AES-GCM usando contraseña derivada
+    fun decryptWithPasswordGCM(
+        encryptedData: ByteArray,
+        salt: ByteArray,
+        password: String,
+        iv: ByteArray
+    ): ByteArray {
+        val secretKey = deriveKeyFromPassword(password, salt)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val spec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
+        return cipher.doFinal(encryptedData)
+    }
+
     fun encryptKeyWithPublicKey(secretKey: ByteArray, publicKeyPEM: String): ByteArray {
         val publicKey = decodePublicKey(publicKeyPEM)
         val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
@@ -41,7 +52,6 @@ object CryptoUtils {
         return cipher.doFinal(secretKey)
     }
 
-    // Descifra una clave AES con una clave privada RSA
     fun decryptKeyWithPrivateKey(encryptedKey: ByteArray, privateKeyPEM: String): ByteArray {
         val privateKey = decodePrivateKey(privateKeyPEM)
         val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
@@ -49,7 +59,6 @@ object CryptoUtils {
         return cipher.doFinal(encryptedKey)
     }
 
-    // Decodifica una clave pública PEM (formato X.509)
     private fun decodePublicKey(pem: String): PublicKey {
         val clean = pem.replace("-----BEGIN PUBLIC KEY-----", "")
             .replace("-----END PUBLIC KEY-----", "")
@@ -59,7 +68,6 @@ object CryptoUtils {
         return KeyFactory.getInstance("RSA").generatePublic(spec)
     }
 
-    // Decodifica una clave privada PEM (formato PKCS8)
     private fun decodePrivateKey(pem: String): PrivateKey {
         val clean = pem.replace("-----BEGIN PRIVATE KEY-----", "")
             .replace("-----END PRIVATE KEY-----", "")
@@ -69,7 +77,8 @@ object CryptoUtils {
         return KeyFactory.getInstance("RSA").generatePrivate(spec)
     }
 
-    // Descifra contenido usando AES CBC con clave derivada desde contraseña
+    // ❌ OPCIONAL: Ya no se necesita si solo se usa GCM
+    @Deprecated("Usa GCM en lugar de CBC", ReplaceWith("decryptWithPasswordGCM(...)"))
     fun decryptWithPassword(
         encryptedData: ByteArray,
         salt: ByteArray,
