@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,7 +42,23 @@ import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.DismissValue
 import androidx.compose.material.icons.filled.FileDownload
+import me.saket.swipe.SwipeAction
+import me.saket.swipe.SwipeableActionsBox
+import androidx.compose.ui.input.pointer.pointerInput
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.FileDownload
+import com.safeguard.endcrypt_android.MyApp.Companion.context
 
 
 @OptIn(
@@ -56,6 +73,7 @@ fun EncryptFileScreen() {
     var showDialog by remember { mutableStateOf(false) }
 
     val encryptDir = File(context.filesDir, "EncryptApp")
+    var activeFile by remember { mutableStateOf<File?>(null) }
 
     LaunchedEffect(Unit) {
         if (encryptDir.exists()) {
@@ -95,8 +113,15 @@ fun EncryptFileScreen() {
         },
         containerColor = Color(0xFF0F1B1E)
     ) { padding ->
+
+
+        val openFile = remember { mutableStateOf<File?>(null) }
+
         Column(
             Modifier
+                .pointerInput(Unit) {
+                    detectTapGestures { openFile.value = null }
+                }
                 .padding(padding)
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
@@ -118,59 +143,41 @@ fun EncryptFileScreen() {
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(filteredFiles) { file ->
-                    val dismissState = rememberDismissState()
-
-                    SwipeToDismiss(
-                        state = dismissState,
-                        directions = setOf(DismissDirection.EndToStart),
-                        dismissThresholds = { FractionalThreshold(0.25f) },
-                        background = {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color(0xFF263238))
-                                    .padding(end = 12.dp),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(onClick = {
-                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "application/json"
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    context.startActivity(Intent.createChooser(intent, "Compartir archivo"))
-                                }) {
-                                    Icon(Icons.Default.Share, contentDescription = "Compartir", tint = Color.Cyan)
-                                }
-
-                                IconButton(onClick = {
-                                    val downloadDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android")
-                                    downloadDir.mkdirs()
-                                    val outFile = File(downloadDir, file.name)
-                                    outFile.writeText(file.readText())
-                                    Toast.makeText(context, "✔️ Archivo descargado", Toast.LENGTH_SHORT).show()
-                                }) {
-                                    Icon(Icons.Default.FileDownload, contentDescription = "Descargar", tint = Color.White)
-                                }
-
-                                IconButton(onClick = {
-                                    file.delete()
-                                    encryptedFiles = encryptedFiles.filter { it.exists() }
-                                }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red)
-                                }
-                            }
+                    SwipeableFileItemV2(
+                        file = file,
+                        isOpen = openFile.value == file,
+                        onSetOpen = { selected ->
+                            openFile.value = if (selected) file else null
                         },
-                        dismissContent = {
-                            FileItemStyled(file)
+                        onDownload = {
+                            val downloadDir = File(
+                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                                "Encrypt_Android"
+                            )
+                            downloadDir.mkdirs()
+                            val outFile = File(downloadDir, file.name)
+                            outFile.writeText(file.readText())
+                            Toast.makeText(context, "✔️ Archivo descargado", Toast.LENGTH_SHORT).show()
+                        },
+                        onDeleteConfirmed = {
+                            file.delete()
+                            encryptedFiles = encryptedFiles.filter { it.exists() }
+                        },
+                        onShare = {
+                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "application/json"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Compartir archivo"))
                         }
                     )
                     Divider(color = Color.DarkGray, thickness = 0.6.dp)
                 }
             }
         }
+
     }
 }
 
@@ -190,6 +197,46 @@ fun FileItemStyled(file: File) {
         )
     }
 }
+
+@Composable
+fun FileItemSwipeable(
+    file: File,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
+    onEncrypt: () -> Unit
+) {
+    val share = SwipeAction(
+        icon = {
+            Icon(Icons.Default.Share, contentDescription = "Compartir", tint = Color.Cyan)
+        },
+        background = Color(0xFF37474F),
+        onSwipe = onShare
+    )
+
+    val delete = SwipeAction(
+        icon = {
+            Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.White)
+        },
+        background = Color.Red,
+        onSwipe = onDelete
+    )
+
+    val encrypt = SwipeAction(
+        icon = {
+            Icon(Icons.Default.Lock, contentDescription = "Cifrar", tint = Color.White)
+        },
+        background = Color(0xFF00BCD4),
+        onSwipe = onEncrypt
+    )
+
+    SwipeableActionsBox(
+        endActions = listOf(encrypt, delete, share),
+        swipeThreshold = 100.dp
+    ) {
+        FileItemStyled(file)
+    }
+}
+
 
 
 
@@ -337,6 +384,128 @@ fun EncryptFileDialog(
         }
 
 
+@Composable
+fun SwipeableFileItemV2(
+    file: File,
+    isOpen: Boolean,
+    onSetOpen: (Boolean) -> Unit,
+    onDownload: () -> Unit,
+    onDeleteConfirmed: () -> Unit,
+    onShare: () -> Unit
+) {
+    val buttonWidth = 80.dp
+    val swipeThresholdPx = with(LocalDensity.current) { (buttonWidth * 3).toPx() }
+    var offsetX by remember { mutableStateOf(0f) }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isOpen) {
+        offsetX = if (isOpen) -swipeThresholdPx else 0f
+    }
+
+    val context = LocalContext.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(70.dp)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { _, dragAmount ->
+                        offsetX = (offsetX + dragAmount).coerceIn(-swipeThresholdPx, 0f)
+                    },
+                    onDragEnd = {
+                        if (offsetX < -swipeThresholdPx / 2) {
+                            onSetOpen(true)
+                        } else {
+                            onSetOpen(false)
+                        }
+                    }
+                )
+            }
+    ) {
+        Row(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color(0xFF263238)),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ActionButton(
+                icon = Icons.Default.FileDownload,
+                backgroundColor = Color(0xFF00BCD4),
+                onClick = onDownload
+            )
+            ActionButton(
+                icon = Icons.Default.Delete,
+                backgroundColor = Color(0xFFF44336),
+                onClick = { showConfirmDialog = true }
+            )
+            ActionButton(
+                icon = Icons.Default.Share,
+                backgroundColor = Color(0xFFFF9800),
+                onClick = onShare
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.roundToInt(), 0) }
+                .fillMaxSize()
+                .background(Color(0xFF1E2A2D))
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
+            Column {
+                Text(file.name, color = Color.White, fontSize = 16.sp, maxLines = 1)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "📅 Modificado: ${
+                        SimpleDateFormat("dd/MM/yyyy, HH:mm", Locale.getDefault()).format(file.lastModified())
+                    }",
+                    color = Color.LightGray,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            title = { Text("¿Eliminar archivo?") },
+            text = { Text("¿Seguro que deseas eliminar \"${file.name}\"?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showConfirmDialog = false
+                    onDeleteConfirmed()
+                }) {
+                    Text("Eliminar", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+}
 
 
-
+@Composable
+fun ActionButton(
+    icon: ImageVector,
+    backgroundColor: Color,
+    iconTint: Color = Color.White,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .width(80.dp)
+            .fillMaxHeight()
+            .background(backgroundColor)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = iconTint)
+    }
+}
