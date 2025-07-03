@@ -87,6 +87,7 @@ object Encryptor {
 
         publicFile.writeText(json.toString())
         privateFile.writeText(json.toString())
+        saveCopyToDatFolder(publicFile.name, json.toString())
 
         return publicFile
     }
@@ -122,8 +123,18 @@ object Encryptor {
 
         publicFile.writeText(json.toString())
         privateFile.writeText(json.toString())
+        saveCopyToDatFolder(publicFile.name, json.toString())
 
         return publicFile
     }
+
+    private fun saveCopyToDatFolder(fileName: String, content: String) {
+        val datDir = File(MyApp.context.filesDir, "Encrypt_Android/dat")
+        if (!datDir.exists()) datDir.mkdirs()
+
+        val copyFile = File(datDir, fileName)
+        copyFile.writeText(content)
+    }
+
 
 }
