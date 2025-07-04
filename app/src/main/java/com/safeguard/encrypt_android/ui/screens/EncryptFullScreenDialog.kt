@@ -252,7 +252,7 @@ fun EncryptFullScreenDialog(
 
                         val finalFileName = generateUniqueFileName(finalDir, resultFile.name)
                         val finalFile = File(finalDir, finalFileName)
-                        resultFile.copyTo(finalFile)
+                        resultFile.renameTo(finalFile)
 
                         Toast.makeText(context, "Archivo cifrado exitosamente", Toast.LENGTH_SHORT).show()
                         onSuccess(finalFile)
