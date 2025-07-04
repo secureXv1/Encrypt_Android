@@ -53,9 +53,18 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import org.json.JSONObject
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Visibility
+import com.safeguard.encrypt_android.ui.screens.EncryptFullScreenDialog
+
+
 
 
 @OptIn(
@@ -67,11 +76,11 @@ fun EncryptFileScreen() {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var encryptedFiles by remember { mutableStateOf(listOf<File>()) }
-    var showDialog by remember { mutableStateOf(false) }
+    var showFullDialog by remember { mutableStateOf(false) } // ⬅️ Nuevo
 
     val encryptDir = File(context.filesDir, "EncryptApp")
-    var openFile by remember { mutableStateOf<File?>(null) } // Para swipe
-    var infoFile by remember { mutableStateOf<File?>(null) } // Para info
+    var openFile by remember { mutableStateOf<File?>(null) }
+    var infoFile by remember { mutableStateOf<File?>(null) }
 
     LaunchedEffect(Unit) {
         if (encryptDir.exists()) {
@@ -85,24 +94,12 @@ fun EncryptFileScreen() {
         it.name.contains(searchQuery, ignoreCase = true)
     }
 
-    if (showDialog) {
-        EncryptFileDialog(
-            context = context,
-            keyFiles = context.filesDir.listFiles()?.filter { it.name.endsWith("_public.pem") } ?: emptyList(),
-            onDismiss = { showDialog = false },
-            onSuccess = { file ->
-                encryptedFiles = encryptedFiles + file
-                showDialog = false
-            }
-        )
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Archivos Cifrados", color = Color.White) },
                 actions = {
-                    IconButton(onClick = { showDialog = true }) {
+                    IconButton(onClick = { showFullDialog = !showFullDialog }) {
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -111,14 +108,13 @@ fun EncryptFileScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Nuevo archivo",
+                                imageVector = if (showFullDialog) Icons.Default.Close else Icons.Default.Add,
+                                contentDescription = if (showFullDialog) "Cerrar" else "Nuevo archivo",
                                 tint = Color.White,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
                     }
-
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E))
             )
@@ -174,14 +170,13 @@ fun EncryptFileScreen() {
                             }
                             context.startActivity(Intent.createChooser(intent, "Compartir archivo"))
                         },
-                        onInfoClick = { infoFile = file } // ✅ NUEVO
+                        onInfoClick = { infoFile = file }
                     )
                     Divider(color = Color.DarkGray, thickness = 0.6.dp)
                 }
             }
         }
 
-        // Ventana emergente con detalles del archivo
         infoFile?.let { file ->
             val json = runCatching {
                 val jsonStr = file.readText()
@@ -210,7 +205,18 @@ fun EncryptFileScreen() {
             )
         }
 
-
+        // ⬅️ Diálogo full screen
+        if (showFullDialog) {
+            EncryptFullScreenDialog(
+                context = context,
+                keyFiles = context.filesDir.listFiles()?.filter { it.name.endsWith("_public.pem") } ?: emptyList(),
+                onDismiss = { showFullDialog = false },
+                onSuccess = { file ->
+                    encryptedFiles = encryptedFiles + file
+                    showFullDialog = false
+                }
+            )
+        }
     }
 }
 
@@ -270,152 +276,6 @@ fun FileItemSwipeable(
         FileItemStyled(file)
     }
 }
-
-
-
-
-
-
-@Composable
-fun EncryptFileDialog(
-            context: Context,
-            keyFiles: List<File>,
-            onDismiss: () -> Unit,
-            onSuccess: (File) -> Unit
-        ) {
-            val userUuid = UuidUtils.getClientUUID(context)
-
-            var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
-            var selectedFileName by remember { mutableStateOf("") }
-            var encryptionMethod by remember { mutableStateOf<Encryptor.Metodo?>(null) }
-            var password by remember { mutableStateOf("") }
-            var selectedKeyFile by remember { mutableStateOf<File?>(null) }
-            var isEncrypting by remember { mutableStateOf(false) }
-
-            val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                selectedFileUri = uri
-                selectedFileName = uri?.lastPathSegment?.substringAfterLast('/') ?: ""
-            }
-
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                confirmButton = {},
-                title = { Text("Nuevo archivo a cifrar") },
-                text = {
-                    Column {
-                        OutlinedButton(
-                            onClick = { launcher.launch(arrayOf("*/*")) },
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text("📁 Seleccionar archivo")
-                        }
-
-                        if (selectedFileName.isNotBlank()) {
-                            Text("Archivo: $selectedFileName", fontSize = 13.sp, color = Color.Gray)
-                        }
-
-                        Spacer(Modifier.height(12.dp))
-
-                        Text("Método de cifrado:", color = Color.Black)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = encryptionMethod == Encryptor.Metodo.PASSWORD,
-                                onClick = { encryptionMethod = Encryptor.Metodo.PASSWORD }
-                            )
-                            Text("Contraseña")
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = encryptionMethod == Encryptor.Metodo.RSA,
-                                onClick = { encryptionMethod = Encryptor.Metodo.RSA }
-                            )
-                            Text("Llave pública")
-                        }
-
-                        if (encryptionMethod == Encryptor.Metodo.PASSWORD) {
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { password = it },
-                                label = { Text("Contraseña") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        } else if (encryptionMethod == Encryptor.Metodo.RSA) {
-                            var expanded by remember { mutableStateOf(false) }
-
-                            Box {
-                                OutlinedButton(
-                                    onClick = { expanded = true },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(selectedKeyFile?.name ?: "Elegir llave pública")
-                                }
-
-                                DropdownMenu(
-                                    expanded = expanded,
-                                    onDismissRequest = { expanded = false }
-                                ) {
-                                    keyFiles.forEach { file ->
-                                        DropdownMenuItem(
-                                            text = { Text(file.name) },
-                                            onClick = {
-                                                selectedKeyFile = file
-                                                expanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(12.dp))
-
-                        Button(
-                            onClick = {
-                                if (selectedFileUri == null || encryptionMethod == null) {
-                                    Toast.makeText(context, "Faltan datos", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-
-                                val inputStream = context.contentResolver.openInputStream(selectedFileUri!!)
-                                val fileBytes = inputStream?.readBytes()
-                                val fileName = getFileNameFromUri(context, selectedFileUri!!)
-
-                                if (fileBytes == null || fileName == null) {
-                                    Toast.makeText(context, "No se pudo leer el archivo", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-
-                                val originalFile = File(context.cacheDir, fileName).apply { writeBytes(fileBytes) }
-
-                                isEncrypting = true
-
-                                val resultFile = when (encryptionMethod) {
-                                    Encryptor.Metodo.PASSWORD -> Encryptor.encryptWithPassword(originalFile, password, userUuid)
-                                    Encryptor.Metodo.RSA -> {
-                                        val pem = selectedKeyFile?.readText()
-                                        if (pem != null) Encryptor.encryptWithPublicKey(originalFile, pem, userUuid)
-                                        else null
-                                    }
-                                    else -> null
-                                }
-
-                                isEncrypting = false
-
-                                if (resultFile != null) {
-                                    Toast.makeText(context, "Archivo cifrado exitosamente", Toast.LENGTH_SHORT).show()
-                                    onSuccess(resultFile)
-                                    onDismiss()
-                                }
-                            },
-                            enabled = !isEncrypting
-                        ) {
-                            Text("CIFRAR")
-                        }
-                    }
-                }
-            )
-        }
 
 
 @Composable
@@ -604,4 +464,6 @@ fun InfoDialog(file: File, onDismiss: () -> Unit) {
         }
     )
 }
+
+
 
