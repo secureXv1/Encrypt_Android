@@ -43,13 +43,14 @@ import java.util.*
 fun EncryptFullScreenDialog(
     context: Context,
     keyFiles: List<File>,
+    initialFile: File? = null,
     onDismiss: () -> Unit,
     onSuccess: (File) -> Unit
 ) {
     val userUuid = UuidUtils.getClientUUID(context)
 
-    var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedFileName by remember { mutableStateOf("") }
+    var selectedFile by remember { mutableStateOf(initialFile) }
+    var selectedFileName by remember { mutableStateOf(initialFile?.name ?: "") }
     var encryptionMethod by remember { mutableStateOf(Encryptor.Metodo.PASSWORD) }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -58,8 +59,17 @@ fun EncryptFullScreenDialog(
     var isEncrypting by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        selectedFileUri = uri
-        selectedFileName = uri?.lastPathSegment?.substringAfterLast('/') ?: ""
+        if (uri != null) {
+            val fileName = getFileNameFromUri(context, uri)
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val fileBytes = inputStream?.readBytes()
+            if (fileBytes != null && fileName != null) {
+                val tempFile = File(context.cacheDir, generateUniqueFileName(context.cacheDir, fileName))
+                tempFile.writeBytes(fileBytes)
+                selectedFile = tempFile
+                selectedFileName = fileName
+            }
+        }
     }
 
     Scaffold(
@@ -85,7 +95,7 @@ fun EncryptFullScreenDialog(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E)),
-                modifier = Modifier.height(52.dp) // misma altura que la pantalla principal
+                modifier = Modifier.height(52.dp)
             )
         },
         containerColor = Color(0xFF0F1B1E)
@@ -96,12 +106,14 @@ fun EncryptFullScreenDialog(
                 .padding(horizontal = 20.dp, vertical = 12.dp)
                 .fillMaxSize()
         ) {
-            Button(
-                onClick = { launcher.launch(arrayOf("*/*")) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("📁 Seleccionar archivo")
+            if (initialFile == null) {
+                Button(
+                    onClick = { launcher.launch(arrayOf("*/*")) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("📁 Seleccionar archivo")
+                }
             }
 
             if (selectedFileName.isNotBlank()) {
@@ -110,7 +122,7 @@ fun EncryptFullScreenDialog(
 
             Spacer(Modifier.height(16.dp))
 
-            // Selector de método
+            // Método de cifrado
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -217,7 +229,7 @@ fun EncryptFullScreenDialog(
             Spacer(Modifier.height(20.dp))
             Button(
                 onClick = {
-                    if (selectedFileUri == null) {
+                    if (selectedFile == null) {
                         Toast.makeText(context, "Seleccione un archivo", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
@@ -226,26 +238,17 @@ fun EncryptFullScreenDialog(
                         return@Button
                     }
 
-                    val inputStream = context.contentResolver.openInputStream(selectedFileUri!!)
-                    val fileBytes = inputStream?.readBytes()
-                    val fileName = getFileNameFromUri(context, selectedFileUri!!)
-                    if (fileBytes == null || fileName == null) {
-                        Toast.makeText(context, "No se pudo leer el archivo", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    val uniqueFileName = generateUniqueFileName(context.cacheDir, fileName)
-                    val originalFile = File(context.cacheDir, uniqueFileName).apply { writeBytes(fileBytes) }
-
                     isEncrypting = true
                     val resultFile = when (encryptionMethod) {
-                        Encryptor.Metodo.PASSWORD -> Encryptor.encryptWithPassword(originalFile, password, userUuid)
+                        Encryptor.Metodo.PASSWORD -> Encryptor.encryptWithPassword(selectedFile!!, password, userUuid)
                         Encryptor.Metodo.RSA -> {
                             val pem = selectedKeyFile?.readText()
-                            if (pem != null) Encryptor.encryptWithPublicKey(originalFile, pem, userUuid)
+                            if (pem != null) Encryptor.encryptWithPublicKey(selectedFile!!, pem, userUuid)
                             else null
                         }
                     }
                     isEncrypting = false
+
                     if (resultFile != null) {
                         val finalDir = File(context.filesDir, "EncryptApp")
                         finalDir.mkdirs()
@@ -268,6 +271,7 @@ fun EncryptFullScreenDialog(
         }
     }
 }
+
 
 
 fun evaluarFortaleza(password: String): Pair<Int, String> {
