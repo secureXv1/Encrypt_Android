@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -36,6 +37,8 @@ import com.safeguard.encrypt_android.utils.getFileNameFromUri
 import java.io.File
 import java.util.*
 
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EncryptFullScreenDialog(
     context: Context,
@@ -59,19 +62,26 @@ fun EncryptFullScreenDialog(
         selectedFileName = uri?.lastPathSegment?.substringAfterLast('/') ?: ""
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color(0xFF121212).copy(alpha = 0.95f),
-        shape = RoundedCornerShape(0.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Archivos Cifrados", color = Color.White, fontSize = 20.sp)
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.VisibilityOff, contentDescription = "Cerrar", tint = Color.White)
-                }
-            }
-
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Archivos Cifrados", color = Color.White) },
+                actions = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E))
+            )
+        },
+        containerColor = Color(0xFF121212)
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .fillMaxSize()
+        ) {
             Button(
                 onClick = { launcher.launch(arrayOf("*/*")) },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
@@ -86,6 +96,7 @@ fun EncryptFullScreenDialog(
 
             Spacer(Modifier.height(16.dp))
 
+            // Selector de método
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -109,8 +120,7 @@ fun EncryptFullScreenDialog(
                             .background(if (selected) selectedColor else Color.Transparent)
                             .clickable {
                                 encryptionMethod = if (index == 0) Encryptor.Metodo.PASSWORD else Encryptor.Metodo.RSA
-                            }
-                            .padding(vertical = 8.dp),
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -235,6 +245,7 @@ fun EncryptFullScreenDialog(
         }
     }
 }
+
 
 fun evaluarFortaleza(password: String): Pair<Int, String> {
     var nivel = 0

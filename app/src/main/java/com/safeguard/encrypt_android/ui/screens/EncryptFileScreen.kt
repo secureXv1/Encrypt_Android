@@ -61,7 +61,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import org.json.JSONObject
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.ui.unit.LayoutDirection
 import com.safeguard.encrypt_android.ui.screens.EncryptFullScreenDialog
 
 
@@ -99,51 +101,90 @@ fun EncryptFileScreen() {
             TopAppBar(
                 title = { Text("Archivos Cifrados", color = Color.White) },
                 actions = {
-                    IconButton(onClick = { showFullDialog = !showFullDialog }) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(color = Color(0xFF00BCD4), shape = RoundedCornerShape(50))
-                                .padding(4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (showFullDialog) Icons.Default.Close else Icons.Default.Add,
-                                contentDescription = if (showFullDialog) "Cerrar" else "Nuevo archivo",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
+                    IconButton(onClick = { showFullDialog = true }) {
+                        if (!showFullDialog) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(color = Color(0xFF00BCD4), shape = RoundedCornerShape(50))
+                                    .padding(4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Nuevo archivo",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
                         }
                     }
+
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E)),
+                modifier = Modifier.height(52.dp) // altura compacta
             )
         },
         containerColor = Color(0xFF0F1B1E)
     ) { padding ->
         Column(
-            Modifier
-                .pointerInput(Unit) {
-                    detectTapGestures { openFile = null }
-                }
-                .padding(padding)
+            modifier = Modifier
+                .padding(
+                    top = padding.calculateTopPadding() + 12.dp, // ⬅️ agrega separación real
+                    start = padding.calculateStartPadding(LayoutDirection.Ltr),
+                    end = padding.calculateEndPadding(LayoutDirection.Ltr),
+                    bottom = padding.calculateBottomPadding()
+                )
                 .fillMaxSize()
         ) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text("Buscar archivo") },
+                placeholder = {
+                    Text(
+                        text = "Buscar archivo",
+                        color = Color.LightGray
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Buscar",
+                        tint = Color.Gray,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Limpiar",
+                                tint = Color.Gray
+                            )
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp),
+                    .padding(horizontal = 12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Color(0xFF00BCD4),
-                    unfocusedBorderColor = Color.Gray
+                    unfocusedBorderColor = Color.DarkGray,
+                    unfocusedLabelColor = Color.Gray
                 ),
                 singleLine = true,
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(12.dp)
             )
 
+
+
+
+
+            Spacer(Modifier.height(12.dp))
+
+
+            // 📂 Lista de archivos
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(filteredFiles) { file ->
                     SwipeableFileItemV2(
@@ -205,18 +246,18 @@ fun EncryptFileScreen() {
             )
         }
 
-        // ⬅️ Diálogo full screen
-        if (showFullDialog) {
-            EncryptFullScreenDialog(
-                context = context,
-                keyFiles = context.filesDir.listFiles()?.filter { it.name.endsWith("_public.pem") } ?: emptyList(),
-                onDismiss = { showFullDialog = false },
-                onSuccess = { file ->
-                    encryptedFiles = encryptedFiles + file
-                    showFullDialog = false
-                }
-            )
-        }
+    }
+    // ⬅️ Diálogo full screen
+    if (showFullDialog) {
+        EncryptFullScreenDialog(
+            context = context,
+            keyFiles = context.filesDir.listFiles()?.filter { it.name.endsWith("_public.pem") } ?: emptyList(),
+            onDismiss = { showFullDialog = false },
+            onSuccess = { file ->
+                encryptedFiles = encryptedFiles + file
+                showFullDialog = false
+            }
+        )
     }
 }
 
