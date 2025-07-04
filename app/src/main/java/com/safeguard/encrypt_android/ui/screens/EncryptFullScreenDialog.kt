@@ -11,9 +11,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -49,7 +52,6 @@ fun EncryptFullScreenDialog(
     var confirmPassword by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var selectedKeyFile by remember { mutableStateOf<File?>(null) }
-    var keySearch by remember { mutableStateOf("") }
     var isEncrypting by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -64,9 +66,9 @@ fun EncryptFullScreenDialog(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Cifrado de archivo", color = Color.White, fontSize = 20.sp)
-                TextButton(onClick = onDismiss) {
-                    Text("Cancelar", color = Color(0xFF2196F3))
+                Text("Archivos Cifrados", color = Color.White, fontSize = 20.sp)
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.VisibilityOff, contentDescription = "Cerrar", tint = Color.White)
                 }
             }
 
@@ -181,29 +183,11 @@ fun EncryptFullScreenDialog(
 
             if (encryptionMethod == Encryptor.Metodo.RSA) {
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = keySearch,
-                    onValueChange = { keySearch = it },
-                    label = { Text("Buscar llave") },
-                    modifier = Modifier.fillMaxWidth()
+                KeySelectionSection(
+                    keyFiles = keyFiles,
+                    selectedKey = selectedKeyFile,
+                    onKeySelected = { selectedKeyFile = it }
                 )
-                val filteredKeys = keyFiles.filter { it.name.contains(keySearch, ignoreCase = true) }
-                Column(modifier = Modifier.heightIn(max = 200.dp)) {
-                    filteredKeys.forEach { file ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedKeyFile = file
-                                }
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = selectedKeyFile == file, onClick = { selectedKeyFile = file })
-                            Text(text = file.name, color = Color.White)
-                        }
-                    }
-                }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -260,9 +244,73 @@ fun evaluarFortaleza(password: String): Pair<Int, String> {
     if (password.any { !it.isLetterOrDigit() }) nivel++
 
     return when (nivel) {
-        0, 1 ->  Pair(25, "Débil")
-        2     -> Pair(50, "Media")
-        3, 4  -> Pair(100, "Fuerte")
-        else  -> Pair(0, "Débil")
+        0, 1 -> Pair(25, "Débil")
+        2 -> Pair(50, "Media")
+        3, 4 -> Pair(100, "Fuerte")
+        else -> Pair(0, "Débil")
+    }
+}
+
+@Composable
+fun KeySelectionSection(
+    keyFiles: List<File>,
+    selectedKey: File?,
+    onKeySelected: (File) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredKeys = remember(searchQuery, keyFiles) {
+        keyFiles.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+
+    Column {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            label = { Text("Buscar llave") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF00BCD4),
+                unfocusedBorderColor = Color.Gray
+            )
+        )
+
+        LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
+            items(filteredKeys) { key ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clickable { onKeySelected(key) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (selectedKey == key) Color(0xFF00BCD4).copy(alpha = 0.2f) else Color(0xFF1E2A2D)
+                    ),
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.padding(end = 12.dp)
+                        )
+                        Text(
+                            text = key.name,
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        }
     }
 }
