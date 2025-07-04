@@ -7,19 +7,16 @@ import android.os.Environment
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.ExperimentalAnimationApi
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.DismissDirection
-import androidx.compose.material.FractionalThreshold
-import androidx.compose.material.SwipeToDismiss
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.rememberDismissState
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,15 +37,12 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Share
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.DismissValue
+
 import androidx.compose.material.icons.filled.FileDownload
 import me.saket.swipe.SwipeAction
 import me.saket.swipe.SwipeableActionsBox
 import androidx.compose.ui.input.pointer.pointerInput
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -56,9 +50,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material.icons.filled.FileDownload
-import com.safeguard.endcrypt_android.MyApp.Companion.context
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import org.json.JSONObject
 
 
 @OptIn(
@@ -73,7 +70,8 @@ fun EncryptFileScreen() {
     var showDialog by remember { mutableStateOf(false) }
 
     val encryptDir = File(context.filesDir, "EncryptApp")
-    var activeFile by remember { mutableStateOf<File?>(null) }
+    var openFile by remember { mutableStateOf<File?>(null) } // Para swipe
+    var infoFile by remember { mutableStateOf<File?>(null) } // Para info
 
     LaunchedEffect(Unit) {
         if (encryptDir.exists()) {
@@ -105,26 +103,35 @@ fun EncryptFileScreen() {
                 title = { Text("Archivos Cifrados", color = Color.White) },
                 actions = {
                     IconButton(onClick = { showDialog = true }) {
-                        Text("➕", fontSize = 22.sp, color = Color.White)
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(color = Color(0xFF00BCD4), shape = RoundedCornerShape(50))
+                                .padding(4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Nuevo archivo",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
+
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E))
             )
         },
         containerColor = Color(0xFF0F1B1E)
     ) { padding ->
-
-
-        val openFile = remember { mutableStateOf<File?>(null) }
-
         Column(
             Modifier
                 .pointerInput(Unit) {
-                    detectTapGestures { openFile.value = null }
+                    detectTapGestures { openFile = null }
                 }
                 .padding(padding)
                 .fillMaxSize()
-
         ) {
             OutlinedTextField(
                 value = searchQuery,
@@ -145,15 +152,10 @@ fun EncryptFileScreen() {
                 items(filteredFiles) { file ->
                     SwipeableFileItemV2(
                         file = file,
-                        isOpen = openFile.value == file,
-                        onSetOpen = { selected ->
-                            openFile.value = if (selected) file else null
-                        },
+                        isOpen = openFile == file,
+                        onSetOpen = { selected -> openFile = if (selected) file else null },
                         onDownload = {
-                            val downloadDir = File(
-                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                                "Encrypt_Android"
-                            )
+                            val downloadDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android")
                             downloadDir.mkdirs()
                             val outFile = File(downloadDir, file.name)
                             outFile.writeText(file.readText())
@@ -171,15 +173,47 @@ fun EncryptFileScreen() {
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
                             context.startActivity(Intent.createChooser(intent, "Compartir archivo"))
-                        }
+                        },
+                        onInfoClick = { infoFile = file } // ✅ NUEVO
                     )
                     Divider(color = Color.DarkGray, thickness = 0.6.dp)
                 }
             }
         }
 
+        // Ventana emergente con detalles del archivo
+        infoFile?.let { file ->
+            val json = runCatching {
+                val jsonStr = file.readText()
+                JSONObject(jsonStr)
+            }.getOrNull()
+
+            val tipo = json?.optString("type") ?: "Desconocido"
+            val pesoKb = file.length() / 1024
+
+            AlertDialog(
+                onDismissRequest = { infoFile = null },
+                title = { Text("Información del archivo") },
+                text = {
+                    Column {
+                        Text("📁 ${file.name}")
+                        Text("📅 ${SimpleDateFormat("dd/MM/yyyy, HH:mm", Locale.getDefault()).format(file.lastModified())}")
+                        Text("🗝️ Tipo de cifrado: ${if (tipo == "password") "Contraseña" else if (tipo == "rsa") "Llave pública" else tipo}")
+                        Text("📦 Tamaño: $pesoKb KB")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { infoFile = null }) {
+                        Text("Cerrar")
+                    }
+                }
+            )
+        }
+
+
     }
 }
+
 
 @Composable
 fun FileItemStyled(file: File) {
@@ -189,7 +223,7 @@ fun FileItemStyled(file: File) {
         .padding(horizontal = 16.dp, vertical = 12.dp)) {
 
         Text(file.name, color = Color.White, fontSize = 16.sp)
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             "📅 Modificado: ${java.text.SimpleDateFormat("dd/MM/yyyy, HH:mm").format(file.lastModified())}",
             color = Color.LightGray,
@@ -391,80 +425,106 @@ fun SwipeableFileItemV2(
     onSetOpen: (Boolean) -> Unit,
     onDownload: () -> Unit,
     onDeleteConfirmed: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onInfoClick: () -> Unit
 ) {
     val buttonWidth = 80.dp
     val swipeThresholdPx = with(LocalDensity.current) { (buttonWidth * 3).toPx() }
     var offsetX by remember { mutableStateOf(0f) }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(isOpen) {
         offsetX = if (isOpen) -swipeThresholdPx else 0f
     }
 
-    val context = LocalContext.current
-
     Box(
         modifier = Modifier
-            .padding(horizontal = 12.dp) // ✅ Padding local, no global
+            .padding(horizontal = 6.dp, vertical = 6.dp)
             .fillMaxWidth()
-            .height(70.dp)
+            .height(65.dp)
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onHorizontalDrag = { _, dragAmount ->
                         offsetX = (offsetX + dragAmount).coerceIn(-swipeThresholdPx, 0f)
                     },
                     onDragEnd = {
-                        if (offsetX < -swipeThresholdPx / 2) {
-                            onSetOpen(true)
-                        } else {
-                            onSetOpen(false)
-                        }
+                        val shouldOpen = offsetX < -swipeThresholdPx / 4
+                        onSetOpen(shouldOpen)
                     }
                 )
             }
     ) {
-        Row(
+        // Fondo de acciones
+        Box(
             modifier = Modifier
                 .matchParentSize()
+                .padding(vertical = 6.dp, horizontal = 6.dp)
+                .clip(RoundedCornerShape(12.dp)) // igual que la tarjeta
                 .background(Color(0xFF263238)),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
+            contentAlignment = Alignment.CenterEnd
         ) {
-            ActionButton(
-                icon = Icons.Default.FileDownload,
-                backgroundColor = Color(0xFF00BCD4),
-                onClick = onDownload
-            )
-            ActionButton(
-                icon = Icons.Default.Delete,
-                backgroundColor = Color(0xFFF44336),
-                onClick = { showConfirmDialog = true }
-            )
-            ActionButton(
-                icon = Icons.Default.Share,
-                backgroundColor = Color(0xFFFF9800),
-                onClick = onShare
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ActionButton(
+                    icon = Icons.Default.FileDownload,
+                    backgroundColor = Color(0xFF00BCD4),
+                    onClick = onDownload
+                )
+                ActionButton(
+                    icon = Icons.Default.Delete,
+                    backgroundColor = Color(0xFFF44336),
+                    onClick = { showConfirmDialog = true }
+                )
+                ActionButton(
+                    icon = Icons.Default.Share,
+                    backgroundColor = Color(0xFFFF9800),
+                    onClick = onShare
+                )
+            }
         }
 
+
+        // Contenido deslizable con estilo moderno
         Box(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), 0) }
                 .fillMaxSize()
-                .background(Color(0xFF1E2A2D))
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-        ) {
-            Column {
-                Text(file.name, color = Color.White, fontSize = 16.sp, maxLines = 1)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "${
-                        SimpleDateFormat("dd/MM/yyyy, HH:mm", Locale.getDefault()).format(file.lastModified())
-                    }",
-                    color = Color.LightGray,
-                    fontSize = 12.sp
+                .clickable { onInfoClick() }
+                .background(
+                    color = Color(0xFF1E2A2D),
+                    shape = RoundedCornerShape(12.dp)
                 )
+                .shadow(4.dp, RoundedCornerShape(12.dp)) // Sombra sutil
+                .padding(horizontal = 12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Image(
+                    painter = painterResource(id = context.resources.getIdentifier("encrypt", "drawable", context.packageName)),
+                    contentDescription = "Archivo cifrado",
+                    modifier = Modifier
+                        .size(34.dp)
+                        .padding(end = 12.dp)
+                )
+
+                Column {
+                    Text(
+                        file.name,
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        maxLines = 1
+                    )
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        SimpleDateFormat("dd/MM/yyyy, HH:mm", Locale.getDefault()).format(file.lastModified()),
+                        color = Color.LightGray,
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
     }
@@ -510,3 +570,38 @@ fun ActionButton(
         Icon(icon, contentDescription = null, tint = iconTint)
     }
 }
+
+@Composable
+fun InfoDialog(file: File, onDismiss: () -> Unit) {
+    val content = try {
+        val json = JSONObject(file.readText())
+        val createdAt = json.optString("created_at", "N/A")
+        val type = json.optString("type", "N/A")
+        val keyName = if (type == "rsa") json.optString("key_user", "No especificada") else "—"
+        Triple(createdAt, type.uppercase(), keyName)
+    } catch (e: Exception) {
+        Triple("Desconocido", "Desconocido", "—")
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        },
+        title = { Text("Información del archivo") },
+        text = {
+            Column {
+                Text("📅 Creado: ${content.first}")
+                Spacer(Modifier.height(8.dp))
+                Text("🔐 Tipo de cifrado: ${content.second}")
+                if (content.second == "RSA") {
+                    Spacer(Modifier.height(8.dp))
+                    Text("🔑 Llave usada: ${content.third}")
+                }
+            }
+        }
+    )
+}
+
