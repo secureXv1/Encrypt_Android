@@ -65,16 +65,30 @@ fun EncryptFullScreenDialog(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Archivos Cifrados", color = Color.White) },
+                title = { Text("Cifrar Archivo", color = Color.White) },
                 actions = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(color = Color(0xFF00BCD4), shape = RoundedCornerShape(50))
+                                .padding(4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cerrar",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E)),
+                modifier = Modifier.height(52.dp) // misma altura que la pantalla principal
             )
         },
-        containerColor = Color(0xFF121212)
+        containerColor = Color(0xFF0F1B1E)
     ) { padding ->
         Column(
             modifier = Modifier
