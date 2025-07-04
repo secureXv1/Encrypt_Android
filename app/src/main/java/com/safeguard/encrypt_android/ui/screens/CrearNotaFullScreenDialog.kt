@@ -39,120 +39,110 @@ fun CrearNotaFullScreenDialog(
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf(TextFieldValue("")) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Crear Nota", color = Color.White) },
-                actions = {
-                    IconButton(onClick = onDismiss) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(color = Color(0xFF00BCD4), shape = RoundedCornerShape(50))
-                                .padding(4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Cerrar",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E)),
-                modifier = Modifier.height(52.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0F1B1E))
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+    ) {
+
+
+        Spacer(Modifier.height(50.dp))
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Título") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF00BCD4),
+                unfocusedBorderColor = Color.Gray
             )
-        },
-        containerColor = Color(0xFF0F1B1E)
-    ) { padding ->
-        Column(
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = content,
+            onValueChange = { content = it },
+            label = { Text("Contenido") },
             modifier = Modifier
-                .padding(padding)
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-                .fillMaxSize()
-        ) {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Título") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF00BCD4),
-                    unfocusedBorderColor = Color.Gray
-                )
-            )
+                .fillMaxWidth()
+                .weight(1f),
+            shape = RoundedCornerShape(10.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF00BCD4),
+                unfocusedBorderColor = Color.Gray
+            ),
+            maxLines = Int.MAX_VALUE
+        )
 
-            Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = content,
-                onValueChange = { content = it },
-                label = { Text("Contenido") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF00BCD4),
-                    unfocusedBorderColor = Color.Gray
-                ),
-                maxLines = Int.MAX_VALUE
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Button(
-                    onClick = {
-                        if (title.isBlank() || content.text.isBlank()) {
-                            Toast.makeText(context, "Debe ingresar título y contenido", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        val file = saveNoteToFile(context, title, content.text)
-                        onSave(file)
-                        onDismiss()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
-                ) {
-                    Text("Guardar")
-                }
-                Button(
-                    onClick = {
-                        if (title.isBlank() || content.text.isBlank()) {
-                            Toast.makeText(context, "Debe ingresar título y contenido", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        val file = saveNoteToFile(context, title, content.text)
-                        onEncrypt(file)
-                        onDismiss()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3))
-                ) {
-                    Text("Cifrar")
-                }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Button(
+                onClick = {
+                    if (title.isBlank() || content.text.isBlank()) {
+                        Toast.makeText(context, "Debe ingresar título y contenido", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    val file = saveNoteToFile(context, title, content.text)
+                    onSave(file)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+            ) {
+                Text("Guardar")
+            }
+            Button(
+                onClick = {
+                    if (title.isBlank() || content.text.isBlank()) {
+                        Toast.makeText(context, "Debe ingresar título y contenido", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    val file = saveNoteToFile(context, title, content.text)
+                    onEncrypt(file)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3))
+            ) {
+                Text("Cifrar")
             }
         }
     }
+
 }
 
 fun saveNoteToFile(context: Context, title: String, content: String): File {
     val safeTitle = title.replace(Regex("[^a-zA-Z0-9_ -]"), "_")
-    val finalDir = File(context.filesDir, "Notas")
-    finalDir.mkdirs()
 
-    val baseFile = File(finalDir, "$safeTitle.txt")
+    // Carpeta principal de notas
+    val notasDir = File(context.filesDir, "Notas")
+    notasDir.mkdirs()
+
+    // Archivo final en la carpeta de notas
+    val baseFile = File(notasDir, "$safeTitle.txt")
     var file = baseFile
     var counter = 1
     while (file.exists()) {
-        file = File(finalDir, "$safeTitle ($counter).txt")
+        file = File(notasDir, "$safeTitle ($counter).txt")
         counter++
     }
+
+    // Escribe el contenido
     file.writeText(content)
+
+    // Copia en Encrypt_Android/dat
+    val copiaDir = File(context.filesDir, "Encrypt_Android/dat")
+    copiaDir.mkdirs()
+
+    val copiaFile = File(copiaDir, file.name)
+    copiaFile.writeText(content)
+
     return file
 }
+
 
 @Composable
 fun SwipeableNoteItem(

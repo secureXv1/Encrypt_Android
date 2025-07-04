@@ -32,7 +32,8 @@ import java.util.*
 @Composable
 fun CrearNotasScreen() {
     val context = LocalContext.current
-    val notesDir = File(context.filesDir, "NotasApp").apply { mkdirs() }
+    val notesDir = File(context.filesDir, "Notas").apply { mkdirs() }
+
 
     val keysDir = File(context.filesDir, "Llaves")
     val keyFiles = keysDir.listFiles()?.filter { it.extension == "pem" } ?: emptyList()
@@ -61,9 +62,16 @@ fun CrearNotasScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Mis Notas", color = Color.White) },
+                title = {
+                    Text(
+                        if (showCreateDialog) "Nueva Nota" else "Mis Notas",
+                        color = Color.White
+                    )
+                },
                 actions = {
-                    IconButton(onClick = { showCreateDialog = true }) {
+                    IconButton(onClick = {
+                        showCreateDialog = !showCreateDialog
+                    }) {
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
@@ -72,8 +80,8 @@ fun CrearNotasScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Nueva nota",
+                                imageVector = if (showCreateDialog) Icons.Default.Close else Icons.Default.Add,
+                                contentDescription = if (showCreateDialog) "Cerrar" else "Nueva nota",
                                 tint = Color.White,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -83,6 +91,8 @@ fun CrearNotasScreen() {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E)),
                 modifier = Modifier.height(52.dp)
             )
+
+
         },
         containerColor = Color(0xFF0F1B1E)
     ) { padding ->

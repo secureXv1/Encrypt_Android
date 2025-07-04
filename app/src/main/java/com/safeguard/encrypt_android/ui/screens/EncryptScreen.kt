@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.outlined.NoteAlt
+
 
 
 
@@ -25,7 +27,7 @@ import androidx.compose.material.icons.filled.Create
 
 enum class EncryptMenuOption(val title: String, val icon: ImageVector) {
     KEYS("Llaves", Icons.Default.VpnKey),
-    CREATE("Crear", Icons.Default.Menu),
+    CREATE("Crear", Icons.Outlined.NoteAlt),
     ENCRYPT("Cifrar/Ocultar", Icons.Default.Lock),
     DECRYPT("Descifrar/Extraer", Icons.Default.LockOpen)
 }
