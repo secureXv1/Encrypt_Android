@@ -233,7 +233,9 @@ fun EncryptFullScreenDialog(
                         Toast.makeText(context, "No se pudo leer el archivo", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-                    val originalFile = File(context.cacheDir, fileName).apply { writeBytes(fileBytes) }
+                    val uniqueFileName = generateUniqueFileName(context.cacheDir, fileName)
+                    val originalFile = File(context.cacheDir, uniqueFileName).apply { writeBytes(fileBytes) }
+
                     isEncrypting = true
                     val resultFile = when (encryptionMethod) {
                         Encryptor.Metodo.PASSWORD -> Encryptor.encryptWithPassword(originalFile, password, userUuid)
@@ -245,8 +247,15 @@ fun EncryptFullScreenDialog(
                     }
                     isEncrypting = false
                     if (resultFile != null) {
+                        val finalDir = File(context.filesDir, "EncryptApp")
+                        finalDir.mkdirs()
+
+                        val finalFileName = generateUniqueFileName(finalDir, resultFile.name)
+                        val finalFile = File(finalDir, finalFileName)
+                        resultFile.copyTo(finalFile)
+
                         Toast.makeText(context, "Archivo cifrado exitosamente", Toast.LENGTH_SHORT).show()
-                        onSuccess(resultFile)
+                        onSuccess(finalFile)
                         onDismiss()
                     }
                 },
@@ -339,3 +348,23 @@ fun KeySelectionSection(
         }
     }
 }
+
+fun generateUniqueFileName(directory: File, originalName: String): String {
+    val baseName = originalName.substringBeforeLast(".")
+    val extension = originalName.substringAfterLast(".", "")
+    var fileName = originalName
+    var counter = 1
+
+    while (File(directory, fileName).exists()) {
+        fileName = if (extension.isNotEmpty()) {
+            "$baseName ($counter).$extension"
+        } else {
+            "$baseName ($counter)"
+        }
+        counter++
+    }
+
+    return fileName
+}
+
+
