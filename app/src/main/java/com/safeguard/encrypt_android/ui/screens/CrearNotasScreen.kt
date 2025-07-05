@@ -39,6 +39,8 @@ fun CrearNotasScreen() {
     val keyFiles = keysDir.listFiles()?.filter { it.extension == "pem" } ?: emptyList()
 
 
+
+
     var noteFiles by remember { mutableStateOf(emptyList<File>()) }
     var searchQuery by remember { mutableStateOf("") }
     var openFile by remember { mutableStateOf<File?>(null) }
@@ -46,6 +48,8 @@ fun CrearNotasScreen() {
 
     // NUEVOS estados
     var archivoSeleccionado by remember { mutableStateOf<File?>(null) }
+    var llavesSeleccionadas by remember { mutableStateOf<List<File>>(emptyList()) }
+
     var showEncryptDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -161,25 +165,28 @@ fun CrearNotasScreen() {
         if (showCreateDialog) {
             CrearNotaFullScreenDialog(
                 context = context,
+                keyFiles = keyFiles, // ✅ PASAR LLAVES
                 onDismiss = { showCreateDialog = false },
                 onSave = { newFile ->
                     noteFiles = noteFiles + newFile
                     showCreateDialog = false
                 },
-                onEncrypt = { file ->
+                onEncrypt = { file, keys ->
                     noteFiles = noteFiles + file
                     archivoSeleccionado = file
+                    llavesSeleccionadas = keys
                     showEncryptDialog = true
                     showCreateDialog = false
                 }
             )
+
+
         }
 
         // MOSTRAR DIALOGO DE CIFRADO
         if (showEncryptDialog && archivoSeleccionado != null) {
             EncryptFullScreenDialog(
                 context = context,
-                keyFiles = keyFiles, // Asegúrate de tener esta variable en tu scope
                 initialFile = archivoSeleccionado,
                 onDismiss = {
                     showEncryptDialog = false

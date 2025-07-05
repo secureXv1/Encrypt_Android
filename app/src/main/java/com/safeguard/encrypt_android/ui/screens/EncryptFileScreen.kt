@@ -251,7 +251,6 @@ fun EncryptFileScreen() {
     if (showFullDialog) {
         EncryptFullScreenDialog(
             context = context,
-            keyFiles = context.filesDir.listFiles()?.filter { it.name.endsWith("_public.pem") } ?: emptyList(),
             onDismiss = { showFullDialog = false },
             onSuccess = { file ->
                 encryptedFiles = encryptedFiles + file

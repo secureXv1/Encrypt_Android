@@ -32,9 +32,10 @@ import kotlin.math.roundToInt
 @Composable
 fun CrearNotaFullScreenDialog(
     context: Context,
+    keyFiles: List<File>,
     onDismiss: () -> Unit,
     onSave: (File) -> Unit,
-    onEncrypt: (File) -> Unit
+    onEncrypt: (File, List<File>) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf(TextFieldValue("")) }
@@ -45,8 +46,6 @@ fun CrearNotaFullScreenDialog(
             .background(Color(0xFF0F1B1E))
             .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-
-
         Spacer(Modifier.height(50.dp))
 
         OutlinedTextField(
@@ -102,7 +101,7 @@ fun CrearNotaFullScreenDialog(
                         return@Button
                     }
                     val file = saveNoteToFile(context, title, content.text)
-                    onEncrypt(file)
+                    onEncrypt(file, keyFiles)
                     onDismiss()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3))
@@ -111,7 +110,6 @@ fun CrearNotaFullScreenDialog(
             }
         }
     }
-
 }
 
 fun saveNoteToFile(context: Context, title: String, content: String): File {

@@ -87,13 +87,17 @@ fun KeygenScreen() {
             type = type,
             content = content,
             onSaved = { finalName ->
-                val file = File(context.filesDir, "${finalName}_${type}.pem")
+                val llavesDir = File(context.filesDir, "Llaves").apply { mkdirs() }
+                val file = File(llavesDir, "${finalName}_${type}.pem")
+
                 if (file.exists()) {
                     Toast.makeText(context, "⚠️ Ya existe una llave con ese nombre", Toast.LENGTH_LONG).show()
                 } else {
                     file.writeText(content)
                     Toast.makeText(context, "✔️ Llave importada como: ${file.name}", Toast.LENGTH_SHORT).show()
-                    pemFiles = context.filesDir.listFiles()?.filter { it.name.endsWith(".pem") }?.sortedBy { it.name } ?: emptyList()
+                    val llavesDir = File(context.filesDir, "Llaves")
+                    pemFiles = llavesDir.listFiles()?.filter { it.name.endsWith(".pem") }?.sortedBy { it.name } ?: emptyList()
+
                 }
                 renameData = null
             },
@@ -107,7 +111,9 @@ fun KeygenScreen() {
 
     // Cargar llaves al iniciar
     LaunchedEffect(Unit) {
-        pemFiles = context.filesDir.listFiles()?.filter { it.name.endsWith(".pem") }?.sortedBy { it.name } ?: emptyList()
+        val llavesDir = File(context.filesDir, "Llaves")
+        pemFiles = llavesDir.listFiles()?.filter { it.name.endsWith(".pem") }?.sortedBy { it.name } ?: emptyList()
+
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -300,8 +306,9 @@ fun CrearLlaveDialog(
                     return@TextButton
                 }
 
-                val pubFile = File(context.filesDir, "${nombreLlave}_public.pem")
-                val privFile = File(context.filesDir, "${nombreLlave}_private.pem")
+                val llavesDir = File(context.filesDir, "Llaves").apply { mkdirs() }
+                val pubFile = File(llavesDir, "${nombreLlave}_public.pem")
+                val privFile = File(llavesDir, "${nombreLlave}_private.pem")
 
                 val saveKeyPair: () -> Unit = {
                     val keyPair = KeyUtils.generateRSAKeyPair()

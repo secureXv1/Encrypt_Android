@@ -42,7 +42,6 @@ import java.util.*
 @Composable
 fun EncryptFullScreenDialog(
     context: Context,
-    keyFiles: List<File>,
     initialFile: File? = null,
     onDismiss: () -> Unit,
     onSuccess: (File) -> Unit
@@ -57,6 +56,11 @@ fun EncryptFullScreenDialog(
     var showPassword by remember { mutableStateOf(false) }
     var selectedKeyFile by remember { mutableStateOf<File?>(null) }
     var isEncrypting by remember { mutableStateOf(false) }
+    val llavesDir = File(context.filesDir, "Llaves").apply { mkdirs() }
+    val keyFiles = remember {
+        llavesDir.listFiles()?.filter { it.extension == "pem" } ?: emptyList()
+    }
+
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
