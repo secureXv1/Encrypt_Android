@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.VpnKey
@@ -463,8 +464,26 @@ fun SwipeableKeyItem(
                     Spacer(Modifier.width(12.dp))
                     Text(name, color = Color.White, fontSize = 16.sp)
                     Spacer(Modifier.width(8.dp))
-                    if (publicKey != null) Text("🔐", fontSize = 16.sp)
-                    if (privateKey != null) Text("🔒", fontSize = 16.sp)
+                    if (publicKey != null) {
+                        Icon(
+                            imageVector = Icons.Filled.VpnKey,
+                            contentDescription = "Llave pública",
+                            tint = Color(0xFF00BCD4),
+                            modifier = Modifier
+                                .size(16.dp)
+                                .padding(start = 4.dp)
+                        )
+                    }
+                    if (privateKey != null) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = "Llave privada",
+                            tint = Color(0xFFFFA000),
+                            modifier = Modifier
+                                .size(16.dp)
+                                .padding(start = 4.dp)
+                        )
+                    }
                 }
 
                 Text(">", color = Color.LightGray, fontSize = 20.sp)
@@ -485,16 +504,26 @@ fun SwipeableKeyItem(
                             sharePemFile(context, publicKey)
                             showDialog = false
                         }) {
-                            Text("🔐 Pública: ${publicKey.name}")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.VpnKey, contentDescription = null, tint = Color(0xFF00BCD4), modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Llave pública", color = Color.White)
+                            }
                         }
+
                     }
                     if (privateKey != null) {
                         TextButton(onClick = {
                             sharePemFile(context, privateKey)
                             showDialog = false
                         }) {
-                            Text("🔒 Privada: ${privateKey.name}")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFFFA000), modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Llave privada", color = Color.White)
+                            }
                         }
+
                     }
                 }
             },
@@ -514,24 +543,39 @@ fun SwipeableKeyItem(
                             confirmDeleteType = "public"
                             showDeleteDialog = false
                         }) {
-                            Text("🔐 Llave pública", color = Color.White)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.VpnKey, contentDescription = null, tint = Color(0xFF00BCD4), modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Eliminar llave pública", color = Color.White)
+                            }
                         }
+
                     }
                     if (privateKey != null) {
                         TextButton(onClick = {
                             confirmDeleteType = "private"
                             showDeleteDialog = false
                         }) {
-                            Text("🔒 Llave privada", color = Color.White)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFFFA000), modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Eliminar llave privada", color = Color.White)
+                            }
                         }
+
                     }
                     if (publicKey != null && privateKey != null) {
                         TextButton(onClick = {
                             confirmDeleteType = "both"
                             showDeleteDialog = false
                         }) {
-                            Text("🗑 Ambas", color = Color.Red)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Eliminar ambas llaves", color = Color.Red)
+                            }
                         }
+
                     }
                 }
             },

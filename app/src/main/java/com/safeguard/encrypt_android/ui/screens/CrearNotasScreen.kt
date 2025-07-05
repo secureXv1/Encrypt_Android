@@ -155,8 +155,13 @@ fun CrearNotasScreen() {
                         onEncrypt = {
                             archivoSeleccionado = file
                             showEncryptDialog = true
+                        },
+                        onEdit = { selected ->
+                            // Aquí puedes abrir un nuevo diálogo o navegar a pantalla de edición
+                            Toast.makeText(context, "Abrir para editar: ${selected.name}", Toast.LENGTH_SHORT).show()
                         }
                     )
+
                     Divider(color = Color.DarkGray, thickness = 0.6.dp)
                 }
             }

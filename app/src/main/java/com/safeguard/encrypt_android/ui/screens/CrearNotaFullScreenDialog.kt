@@ -3,6 +3,7 @@ package com.safeguard.encrypt_android.ui.screens
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -148,7 +149,9 @@ fun SwipeableNoteItem(
     isOpen: Boolean,
     onSetOpen: (Boolean) -> Unit,
     onDelete: () -> Unit,
-    onEncrypt: () -> Unit
+    onEncrypt: () -> Unit,
+    onEdit: (File) -> Unit
+
 ) {
     val buttonWidth = 80.dp
     val swipeThresholdPx = with(LocalDensity.current) { (buttonWidth * 2).toPx() }
@@ -206,18 +209,34 @@ fun SwipeableNoteItem(
                 .fillMaxSize()
                 .background(Color(0xFF1E2A2D), shape = RoundedCornerShape(12.dp))
                 .shadow(4.dp, RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp),
+                .clickable { onEdit(file) }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             contentAlignment = Alignment.CenterStart
         ) {
-            Column {
-                Text(file.nameWithoutExtension, color = Color.White, fontSize = 16.sp)
-                Text(
-                    "📝 Nota TXT",
-                    color = Color.LightGray,
-                    fontSize = 12.sp
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(file.nameWithoutExtension, color = Color.White, fontSize = 16.sp)
+
+                    val dateFormatted = remember(file) {
+                        val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                        sdf.format(Date(file.lastModified()))
+                    }
+
+                    Text(
+                        text = dateFormatted,
+                        color = Color.LightGray,
+                        fontSize = 12.sp
+                    )
+                }
+
+                Text(">", color = Color.LightGray, fontSize = 22.sp)
             }
         }
+
     }
 
     if (showConfirmDialog) {
