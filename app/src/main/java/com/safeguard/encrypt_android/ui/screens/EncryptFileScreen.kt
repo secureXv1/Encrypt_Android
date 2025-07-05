@@ -63,6 +63,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import com.safeguard.encrypt_android.ui.screens.EncryptFullScreenDialog
 
@@ -407,16 +408,21 @@ fun SwipeableFileItemV2(
                     painter = painterResource(id = context.resources.getIdentifier("encrypt", "drawable", context.packageName)),
                     contentDescription = "Archivo cifrado",
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(42.dp)
                         .padding(end = 12.dp)
                 )
 
-                Column {
+                Spacer(Modifier.width(12.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f) // ⬅️ el texto ocupa espacio limitado
+                ) {
                     Text(
                         file.name,
                         color = Color.White,
                         fontSize = 15.sp,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis // ⬅️ para cortar texto largo
                     )
                     Spacer(Modifier.height(1.dp))
                     Text(
@@ -425,8 +431,17 @@ fun SwipeableFileItemV2(
                         fontSize = 11.sp
                     )
                 }
+
+                Spacer(Modifier.width(8.dp))
+
+                Text(
+                    text = ">",
+                    color = Color.LightGray,
+                    fontSize = 22.sp
+                )
             }
         }
+
     }
 
     if (showConfirmDialog) {

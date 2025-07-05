@@ -95,8 +95,12 @@ fun DecryptScreen() {
                     }
 
                     if (showPemPicker) {
-                        PemFilePicker(context) { _, pemContent ->
-                            try {
+                        PemFilePicker(
+                            context = context,
+                            filter = { it.readText().contains("-----BEGIN PRIVATE KEY-----") }
+                        ) { _, pemContent ->
+
+                        try {
                                 val input = context.contentResolver.openInputStream(uri)!!.readBytes()
                                 val temp = File.createTempFile("descifrar", ".json", context.cacheDir)
                                 temp.writeBytes(input)
@@ -182,8 +186,12 @@ fun DecryptScreen() {
                 }
 
                 if (showPemPicker) {
-                    PemFilePicker(context) { _, pemContent ->
-                        try {
+                    PemFilePicker(
+                        context = context,
+                        filter = { it.readText().contains("-----BEGIN PRIVATE KEY-----") }
+                    ) { _, pemContent ->
+
+                    try {
                             val raw = context.contentResolver.openInputStream(uri)!!.readBytes()
                             val parts = raw.toString(Charsets.ISO_8859_1).split("<<--BETTY_START-->>")
                             if (parts.size != 2) throw Exception("Contenido oculto no encontrado")

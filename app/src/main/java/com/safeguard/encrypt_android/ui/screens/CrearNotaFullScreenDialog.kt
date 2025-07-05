@@ -28,6 +28,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.ui.text.style.TextOverflow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,6 +145,8 @@ fun saveNoteToFile(context: Context, title: String, content: String): File {
 }
 
 
+
+
 @Composable
 fun SwipeableNoteItem(
     file: File,
@@ -151,7 +155,6 @@ fun SwipeableNoteItem(
     onDelete: () -> Unit,
     onEncrypt: () -> Unit,
     onEdit: (File) -> Unit
-
 ) {
     val buttonWidth = 80.dp
     val swipeThresholdPx = with(LocalDensity.current) { (buttonWidth * 2).toPx() }
@@ -214,29 +217,45 @@ fun SwipeableNoteItem(
             contentAlignment = Alignment.CenterStart
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
-                    Text(file.nameWithoutExtension, color = Color.White, fontSize = 16.sp)
-
-                    val dateFormatted = remember(file) {
-                        val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-                        sdf.format(Date(file.lastModified()))
-                    }
-
-                    Text(
-                        text = dateFormatted,
-                        color = Color.LightGray,
-                        fontSize = 12.sp
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        tint = Color(0xFF00BCD4),
+                        modifier = Modifier
+                            .size(32.dp)
+                            .padding(end = 8.dp)
                     )
+                    Column {
+                        Text(
+                            file.nameWithoutExtension,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val dateFormatted = remember(file) {
+                            val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                            sdf.format(Date(file.lastModified()))
+                        }
+                        Text(
+                            text = dateFormatted,
+                            color = Color.LightGray,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
 
                 Text(">", color = Color.LightGray, fontSize = 22.sp)
             }
         }
-
     }
 
     if (showConfirmDialog) {
