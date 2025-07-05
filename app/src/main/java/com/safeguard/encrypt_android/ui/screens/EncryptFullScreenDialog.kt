@@ -261,12 +261,14 @@ fun EncryptFullScreenDialog(
 
                         val finalFileName = generateUniqueFileName(finalDir, resultFile.name)
                         val finalFile = File(finalDir, finalFileName)
-                        resultFile.renameTo(finalFile)
+                        resultFile.copyTo(finalFile, overwrite = false)
+                        resultFile.delete()
 
                         Toast.makeText(context, "Archivo cifrado exitosamente", Toast.LENGTH_SHORT).show()
                         onSuccess(finalFile)
                         onDismiss()
                     }
+
                 },
                 enabled = !isEncrypting,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
@@ -376,5 +378,6 @@ fun generateUniqueFileName(directory: File, originalName: String): String {
 
     return fileName
 }
+
 
 
