@@ -58,7 +58,9 @@ fun EncryptFullScreenDialog(
     var isEncrypting by remember { mutableStateOf(false) }
     val llavesDir = File(context.filesDir, "Llaves").apply { mkdirs() }
     val keyFiles = remember {
-        llavesDir.listFiles()?.filter { it.extension == "pem" } ?: emptyList()
+        llavesDir.listFiles()
+            ?.filter { it.extension == "pem" && it.readText().contains("-----BEGIN PUBLIC KEY-----") }
+            ?: emptyList()
     }
 
 
