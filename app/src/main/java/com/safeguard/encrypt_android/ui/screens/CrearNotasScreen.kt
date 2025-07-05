@@ -51,6 +51,11 @@ fun CrearNotasScreen() {
     var llavesSeleccionadas by remember { mutableStateOf<List<File>>(emptyList()) }
 
     var showEncryptDialog by remember { mutableStateOf(false) }
+    var notaEditando by remember { mutableStateOf<File?>(null) }
+    val isEditing = notaEditando != null
+    var showEncryptFromEdit by remember { mutableStateOf(false) }
+
+
 
     LaunchedEffect(Unit) {
         noteFiles = notesDir.listFiles()
@@ -74,7 +79,12 @@ fun CrearNotasScreen() {
                 },
                 actions = {
                     IconButton(onClick = {
-                        showCreateDialog = !showCreateDialog
+                        if (isEditing) {
+                            notaEditando = null
+                        } else {
+                            showCreateDialog = !showCreateDialog
+                        }
+
                     }) {
                         Box(
                             modifier = Modifier
@@ -84,7 +94,7 @@ fun CrearNotasScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (showCreateDialog) Icons.Default.Close else Icons.Default.Add,
+                                imageVector = if (showCreateDialog || isEditing) Icons.Default.Close else Icons.Default.Add,
                                 contentDescription = if (showCreateDialog) "Cerrar" else "Nueva nota",
                                 tint = Color.White,
                                 modifier = Modifier.size(22.dp)
@@ -157,9 +167,9 @@ fun CrearNotasScreen() {
                             showEncryptDialog = true
                         },
                         onEdit = { selected ->
-                            // Aquí puedes abrir un nuevo diálogo o navegar a pantalla de edición
-                            Toast.makeText(context, "Abrir para editar: ${selected.name}", Toast.LENGTH_SHORT).show()
+                            notaEditando = selected
                         }
+
                     )
 
                     Divider(color = Color.DarkGray, thickness = 0.6.dp)
@@ -204,6 +214,44 @@ fun CrearNotasScreen() {
                 }
             )
         }
+
+        if (notaEditando != null) {
+            EditarNotaDialog(
+                context = context,
+                nota = notaEditando!!,
+                onDismiss = { notaEditando = null },
+                onUpdated = { actualizada ->
+                    noteFiles = noteFiles.map {
+                        if (it.name == notaEditando!!.name) actualizada else it
+                    }
+                    notaEditando = null
+                },
+                onEncrypt = { nota ->
+                    archivoSeleccionado = nota
+                    showEncryptFromEdit = true
+                    notaEditando = null
+                }
+            )
+        }
+
+        if (showEncryptFromEdit && archivoSeleccionado != null) {
+            EncryptFullScreenDialog(
+                context = context,
+                initialFile = archivoSeleccionado,
+                onDismiss = {
+                    archivoSeleccionado = null
+                    showEncryptFromEdit = false
+                },
+                onSuccess = {
+                    Toast.makeText(context, "Nota cifrada correctamente", Toast.LENGTH_SHORT).show()
+                    archivoSeleccionado = null
+                    showEncryptFromEdit = false
+                }
+            )
+        }
+
+
+
 
     }
 }

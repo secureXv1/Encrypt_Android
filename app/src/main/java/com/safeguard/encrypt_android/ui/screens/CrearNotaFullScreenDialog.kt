@@ -261,3 +261,108 @@ fun SwipeableNoteItem(
     }
 }
 
+@Composable
+fun EditarNotaDialog(
+    context: Context,
+    nota: File,
+    onDismiss: () -> Unit,
+    onUpdated: (File) -> Unit,
+    onEncrypt: (File) -> Unit
+
+) {
+    var title by remember { mutableStateOf(nota.nameWithoutExtension) }
+    var content by remember { mutableStateOf(TextFieldValue(nota.readText())) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0F1B1E))
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+    ) {
+        Spacer(Modifier.height(50.dp))
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Título") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF00BCD4),
+                unfocusedBorderColor = Color.Gray
+            )
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = content,
+            onValueChange = { content = it },
+            label = { Text("Contenido") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            shape = RoundedCornerShape(10.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF00BCD4),
+                unfocusedBorderColor = Color.Gray
+            ),
+            maxLines = Int.MAX_VALUE
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Button(
+                onClick = {
+                    if (title.isBlank()) {
+                        Toast.makeText(context, "El título no puede estar vacío", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    val notasDir = File(context.filesDir, "Notas")
+                    val newFile = File(notasDir, "$title.txt")
+                    if (newFile != nota) {
+                        nota.delete()
+                    }
+                    newFile.writeText(content.text)
+
+                    val copiaDir = File(context.filesDir, "Encrypt_Android/dat")
+                    val copiaFile = File(copiaDir, newFile.name)
+                    copiaFile.writeText(content.text)
+
+                    onUpdated(newFile)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+            ) {
+                Text("Guardar cambios")
+            }
+
+            Button(
+                onClick = {
+                    val notasDir = File(context.filesDir, "Notas")
+                    val newFile = File(notasDir, "$title.txt")
+                    if (newFile != nota) {
+                        nota.delete()
+                    }
+                    newFile.writeText(content.text)
+
+                    val copiaDir = File(context.filesDir, "Encrypt_Android/dat")
+                    val copiaFile = File(copiaDir, newFile.name)
+                    copiaFile.writeText(content.text)
+
+                    onEncrypt(newFile)
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3))
+            ) {
+                Text("Cifrar")
+            }
+
+        }
+
+    }
+}
+
+
