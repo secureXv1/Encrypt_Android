@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.safeguard.encrypt_android.utils.UuidUtils
 import com.safeguard.encrypt_android.utils.getFileNameFromUri
+import com.safeguard.encrypt_android.utils.shareFile
 import java.io.File
 import java.util.*
 
@@ -64,6 +65,10 @@ fun EncryptFullScreenDialog(
             ?.filter { it.extension == "pem" && it.readText().contains("-----BEGIN PUBLIC KEY-----") }
             ?: emptyList()
     }
+
+    var mostrarPostDialog by remember { mutableStateOf(false) }
+    var archivoRecienCifrado by remember { mutableStateOf<File?>(null) }
+
 
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -257,23 +262,16 @@ fun EncryptFullScreenDialog(
                     }
                     isEncrypting = false
 
-                    if (resultFile != null) {
-                        val finalDir = File(context.filesDir, "EncryptApp")
-                        finalDir.mkdirs()
-
-                        val finalFileName = generateUniqueFileName(finalDir, resultFile.name)
-                        val finalFile = File(finalDir, finalFileName)
-                        resultFile.copyTo(finalFile, overwrite = false)
-                        resultFile.delete()
-
+                    if (resultFile != null && resultFile.exists()) {
                         Toast.makeText(context, "Archivo cifrado exitosamente", Toast.LENGTH_SHORT).show()
 
-                        // Lanzar diálogo de compartir con opción de ocultar
-                        showPostEncryptShareDialog(context, finalFile)
+                        archivoRecienCifrado = resultFile
+                        mostrarPostDialog = true
 
-                        onSuccess(finalFile)
-                        onDismiss()
+                        onSuccess(resultFile) // Ya fue generado correctamente por el Encryptor
                     }
+
+
 
 
                 },
@@ -283,7 +281,21 @@ fun EncryptFullScreenDialog(
             ) {
                 Text("CIFRAR")
             }
+
+
+
+
+
         }
+    }
+    if (mostrarPostDialog && archivoRecienCifrado != null) {
+        PostEncryptOptionsDialog(
+            encryptedFile = archivoRecienCifrado!!,
+            onDismiss = {
+                mostrarPostDialog = false
+                archivoRecienCifrado = null
+            }
+        )
     }
 }
 
@@ -386,87 +398,39 @@ fun generateUniqueFileName(directory: File, originalName: String): String {
     return fileName
 }
 
-fun showPostEncryptShareDialog(context: Context, encryptedFile: File) {
-    val activity = context as? androidx.activity.ComponentActivity ?: return
 
-    activity.runOnUiThread {
-        var showDialog by mutableStateOf(true)
-        var seleccionarContenedor by mutableStateOf(false)
 
-        activity.setContent {
-            if (showDialog) {
-                AlertDialog(
-                    onDismissRequest = { showDialog = false },
-                    title = { Text("✔️ Archivo cifrado") },
-                    text = { Text("¿Deseas ocultarlo dentro de una imagen o PDF antes de compartir?") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            showDialog = false
-                            seleccionarContenedor = true
-                        }) {
-                            Text("Sí, ocultar")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = {
-                            showDialog = false
-                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", encryptedFile)
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/json"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Compartir archivo cifrado"))
-                        }) {
-                            Text("No, solo compartir")
-                        }
-                    },
-                    containerColor = Color(0xFF1A1A1A)
-                )
-            }
 
-            if (seleccionarContenedor) {
-                FilePickerForHiding(encryptedFile = encryptedFile) {
-                    // Ya se oculta y comparte dentro de esa función
-                    seleccionarContenedor = false
-                }
-            }
-        }
-    }
-}
 
 
 @Composable
-fun showOcultarAntesDeCompartirDialog(file: File) {
+fun PostEncryptOptionsDialog(encryptedFile: File, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    var seleccionarArchivoContenedor by remember { mutableStateOf(false) }
+    var seleccionarContenedor by remember { mutableStateOf(false) }
 
-    if (seleccionarArchivoContenedor) {
-        // Aquí luego llamaremos al FilePicker
-        // Y haremos la lógica de ocultamiento (lo verás en el siguiente paso)
+    if (seleccionarContenedor) {
+        FilePickerForHiding(encryptedFile = encryptedFile) {
+            seleccionarContenedor = false
+            onDismiss()
+        }
+        return
     }
 
     AlertDialog(
-        onDismissRequest = { seleccionarArchivoContenedor = false },
-        title = { Text("¿Ocultar archivo antes de compartir?") },
-        text = { Text("Puedes ocultar el archivo cifrado dentro de una imagen o PDF antes de compartirlo.") },
+        onDismissRequest = onDismiss,
+        title = { Text("✔️ Archivo cifrado") },
+        text = { Text("¿Deseas ocultarlo dentro de una imagen o PDF antes de compartir?") },
         confirmButton = {
             TextButton(onClick = {
-                seleccionarArchivoContenedor = true
+                seleccionarContenedor = true
             }) {
                 Text("Sí, ocultar")
             }
         },
         dismissButton = {
             TextButton(onClick = {
-                // Compartir directamente sin ocultar
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/json"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                context.startActivity(Intent.createChooser(intent, "Compartir archivo cifrado"))
+                shareFile(context, encryptedFile)
+                onDismiss()
             }) {
                 Text("No, solo compartir")
             }
@@ -474,6 +438,7 @@ fun showOcultarAntesDeCompartirDialog(file: File) {
         containerColor = Color(0xFF1A1A1A)
     )
 }
+
 
 
 
