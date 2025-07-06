@@ -85,6 +85,8 @@ fun EncryptFileScreen() {
     var openFile by remember { mutableStateOf<File?>(null) }
     var infoFile by remember { mutableStateOf<File?>(null) }
 
+    var postEncryptFile by remember { mutableStateOf<File?>(null) }
+
     LaunchedEffect(Unit) {
         if (encryptDir.exists()) {
             encryptedFiles = encryptDir.listFiles()
@@ -254,11 +256,21 @@ fun EncryptFileScreen() {
             context = context,
             onDismiss = { showFullDialog = false },
             onSuccess = { file ->
-                encryptedFiles = encryptedFiles + file
                 showFullDialog = false
+                postEncryptFile = file
+                encryptedFiles = encryptedFiles + file
             }
         )
     }
+
+    if (postEncryptFile != null) {
+        PostEncryptOptionsDialog(
+            encryptedFile = postEncryptFile!!,
+            onDismiss = { postEncryptFile = null }
+        )
+    }
+
+
 }
 
 

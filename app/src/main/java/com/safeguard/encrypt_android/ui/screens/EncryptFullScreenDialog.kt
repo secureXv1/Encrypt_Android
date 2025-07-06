@@ -66,8 +66,7 @@ fun EncryptFullScreenDialog(
             ?: emptyList()
     }
 
-    var mostrarPostDialog by remember { mutableStateOf(false) }
-    var archivoRecienCifrado by remember { mutableStateOf<File?>(null) }
+
 
 
 
@@ -264,12 +263,9 @@ fun EncryptFullScreenDialog(
 
                     if (resultFile != null && resultFile.exists()) {
                         Toast.makeText(context, "Archivo cifrado exitosamente", Toast.LENGTH_SHORT).show()
-
-                        archivoRecienCifrado = resultFile
-                        mostrarPostDialog = true
-
-                        onSuccess(resultFile) // Ya fue generado correctamente por el Encryptor
+                        onSuccess(resultFile)
                     }
+
 
 
 
@@ -288,15 +284,8 @@ fun EncryptFullScreenDialog(
 
         }
     }
-    if (mostrarPostDialog && archivoRecienCifrado != null) {
-        PostEncryptOptionsDialog(
-            encryptedFile = archivoRecienCifrado!!,
-            onDismiss = {
-                mostrarPostDialog = false
-                archivoRecienCifrado = null
-            }
-        )
-    }
+
+
 }
 
 
