@@ -56,6 +56,8 @@ fun CrearNotasScreen() {
     var notaEditando by remember { mutableStateOf<File?>(null) }
     val isEditing = notaEditando != null
     var showEncryptFromEdit by remember { mutableStateOf(false) }
+    var postEncryptFile by remember { mutableStateOf<File?>(null) }
+
 
 
 
@@ -206,15 +208,17 @@ fun CrearNotasScreen() {
                 context = context,
                 initialFile = archivoSeleccionado,
                 onDismiss = {
-                    showEncryptDialog = false
                     archivoSeleccionado = null
+                    showEncryptDialog = false
                 },
-                onSuccess = {
-                    Toast.makeText(context, "Archivo cifrado correctamente", Toast.LENGTH_SHORT).show()
-                    showEncryptDialog = false
+                onSuccess = { file ->
                     archivoSeleccionado = null
+                    showEncryptDialog = false
+                    postEncryptFile = file
+                    noteFiles = noteFiles + file // Opcional, si deseas que se vea como nota cifrada
                 }
             )
+
         }
 
         if (notaEditando != null) {
@@ -244,13 +248,22 @@ fun CrearNotasScreen() {
                     archivoSeleccionado = null
                     showEncryptFromEdit = false
                 },
-                onSuccess = {
-                    Toast.makeText(context, "Nota cifrada correctamente", Toast.LENGTH_SHORT).show()
+                onSuccess = { file ->
                     archivoSeleccionado = null
                     showEncryptFromEdit = false
+                    postEncryptFile = file // ✅ Esto activa el PostEncryptOptionsDialog
                 }
             )
         }
+
+
+        if (postEncryptFile != null) {
+            PostEncryptOptionsDialog(
+                encryptedFile = postEncryptFile!!,
+                onDismiss = { postEncryptFile = null }
+            )
+        }
+
 
 
 
