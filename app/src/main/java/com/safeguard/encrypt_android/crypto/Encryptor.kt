@@ -70,7 +70,7 @@ object Encryptor {
         val cipherAdmin = Cipher.getInstance("AES/GCM/NoPadding")
         val specAdmin = GCMParameterSpec(128, ivAdmin)
         cipherAdmin.init(Cipher.ENCRYPT_MODE, keyAdmin, specAdmin)
-        val encryptedPassword = cipherAdmin.doFinal(password.toByteArray(Charsets.UTF_8))
+        val sealed = cipherAdmin.doFinal(password.toByteArray(Charsets.UTF_8))
 
         val json = JSONObject().apply {
             put("type", "password")
@@ -81,7 +81,7 @@ object Encryptor {
             put("iv_user", ivUser.toHexString())
             put("iv_admin", ivAdmin.toHexString())
             put("data", encryptedContent.toHexString())
-            put("encrypted_user_password", encryptedPassword.toHexString())
+            put("encrypted_user_password", sealed.toHexString())
             put("created_by", userUuid)
         }
 

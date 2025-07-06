@@ -6,6 +6,7 @@ import java.io.File
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import javax.crypto.SecretKey
 
 object Decryptor {
 
@@ -20,8 +21,10 @@ object Decryptor {
     fun decryptFile(
         inputFile: File,
         promptForPassword: () -> String,
-        privateKeyPEM: String? = null
-    ): Pair<ByteArray, String> {
+        privateKeyPEM: String?,
+        allowAdminRecovery: Boolean = false
+    ): Pair<ByteArray, String>
+    {
         val json = JSONObject(inputFile.readText())
         val ext = json.optString("ext", ".bin")
         val type = json.optString("type", "password")
@@ -54,48 +57,53 @@ object Decryptor {
             }
 
             "password" -> {
-                val password = promptForPassword()
+                val passwordIngresada = promptForPassword()
+
+                val saltUser = Base64.decode(json.getString("salt_user"), Base64.NO_WRAP)
+                val ivUser = json.getString("iv_user").hexToByteArray()
+
+                val claveParaIntentar: SecretKey? = try {
+                    CryptoUtils.deriveKeyFromPassword(passwordIngresada, saltUser)
+                } catch (_: Exception) {
+                    null
+                }
 
                 try {
-                    // Intentar como usuario
-                    val saltUser = Base64.decode(json.getString("salt_user"), Base64.DEFAULT)
-                    val ivUser = json.getString("iv_user").hexToByteArray()
-                    val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser)
-
                     val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                     val spec = GCMParameterSpec(128, ivUser)
-                    cipher.init(Cipher.DECRYPT_MODE, keyUser, spec)
+                    cipher.init(Cipher.DECRYPT_MODE, claveParaIntentar, spec)
                     cipher.doFinal(encryptedBytes)
-
                 } catch (e: Exception) {
-                    // Intentar como administrador
+                    if (passwordIngresada != "SeguraAdmin123!") {
+                        throw IllegalArgumentException("❌ Contraseña incorrecta.")
+                    }
+
                     try {
-                        val saltAdmin = Base64.decode(json.getString("salt_admin"), Base64.DEFAULT)
+                        val saltAdmin = Base64.decode(json.getString("salt_admin"), Base64.NO_WRAP)
                         val ivAdmin = json.getString("iv_admin").hexToByteArray()
-                        val encryptedPasswordHex = json.getString("encrypted_user_password").hexToByteArray()
+                        val encryptedPassword = json.getString("encrypted_user_password").hexToByteArray()
 
                         val keyAdmin = CryptoUtils.deriveKeyFromPassword("SeguraAdmin123!", saltAdmin)
-
                         val cipherAdmin = Cipher.getInstance("AES/GCM/NoPadding")
                         val specAdmin = GCMParameterSpec(128, ivAdmin)
                         cipherAdmin.init(Cipher.DECRYPT_MODE, keyAdmin, specAdmin)
-                        val recoveredPassword = cipherAdmin.doFinal(encryptedPasswordHex).toString(Charsets.UTF_8)
 
-                        // Reintentar con la contraseña del usuario real
-                        val saltUser = Base64.decode(json.getString("salt_user"), Base64.DEFAULT)
-                        val ivUser = json.getString("iv_user").hexToByteArray()
+                        val recoveredPassword = cipherAdmin.doFinal(encryptedPassword).toString(Charsets.UTF_8)
+
                         val keyUser = CryptoUtils.deriveKeyFromPassword(recoveredPassword, saltUser)
 
                         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                         val spec = GCMParameterSpec(128, ivUser)
                         cipher.init(Cipher.DECRYPT_MODE, keyUser, spec)
                         cipher.doFinal(encryptedBytes)
-
                     } catch (ex: Exception) {
-                        throw IllegalArgumentException("❌ Contraseña incorrecta o archivo dañado.")
+                        throw IllegalArgumentException("❌ Recuperación con clave maestra fallida.")
                     }
                 }
             }
+
+
+
 
             else -> throw IllegalArgumentException("❌ Tipo de archivo cifrado desconocido: $type")
         }

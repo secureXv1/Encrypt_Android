@@ -28,12 +28,14 @@ object CryptoController {
     fun decrypt(
         inputFile: File,
         promptForPassword: () -> String,
-        privateKeyPEM: String? = null
+        privateKeyPEM: String? = null,
+        allowAdminRecovery: Boolean = false
     ): File {
         val (decryptedBytes, outputFileName) = Decryptor.decryptFile(
             inputFile = inputFile,
             promptForPassword = promptForPassword,
-            privateKeyPEM = privateKeyPEM
+            privateKeyPEM = privateKeyPEM,
+            allowAdminRecovery = allowAdminRecovery
         )
 
         val outputDir = File(

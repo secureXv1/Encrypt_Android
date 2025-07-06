@@ -78,7 +78,8 @@ fun DecryptScreen() {
                             val outputFile = CryptoController.decrypt(
                                 inputFile = temp,
                                 promptForPassword = { password },
-                                privateKeyPEM = null
+                                privateKeyPEM = null,
+                                allowAdminRecovery = true
                             )
 
                             resultMessage = "✅ Descifrado en: ${outputFile.absolutePath}"
@@ -167,7 +168,8 @@ fun DecryptScreen() {
                         val outputFile = CryptoController.decrypt(
                             inputFile = temp,
                             promptForPassword = { password },
-                            privateKeyPEM = null
+                            privateKeyPEM = null,
+                            allowAdminRecovery = true
                         )
 
                         resultMessage = "✅ Extraído y descifrado en: ${outputFile.absolutePath}"
@@ -206,7 +208,8 @@ fun DecryptScreen() {
                             val outputFile = CryptoController.decrypt(
                                 inputFile = temp,
                                 promptForPassword = { "" },
-                                privateKeyPEM = pemContent
+                                privateKeyPEM = pemContent,
+                                allowAdminRecovery = true
                             )
 
                             resultMessage = "✅ Extraído y descifrado con clave: ${outputFile.absolutePath}"
