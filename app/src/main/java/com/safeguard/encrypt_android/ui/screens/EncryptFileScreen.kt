@@ -206,14 +206,9 @@ fun EncryptFileScreen() {
                             encryptedFiles = encryptedFiles.filter { it.exists() }
                         },
                         onShare = {
-                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "application/json"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "Compartir archivo"))
-                        },
+                            postEncryptFile = file
+                        }
+                        ,
                         onInfoClick = { infoFile = file }
                     )
                     Divider(color = Color.DarkGray, thickness = 0.6.dp)
