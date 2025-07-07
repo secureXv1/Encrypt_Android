@@ -7,6 +7,8 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import javax.crypto.SecretKey
+import com.safeguard.encrypt_android.crypto.MasterKey
+
 
 object Decryptor {
 
@@ -38,16 +40,31 @@ object Decryptor {
                     throw IllegalArgumentException("❌ Se requiere una clave privada para este archivo.")
                 }
 
-                val encryptedKeyHex = json.getString("key_user")
-                val ivHex = json.getString("iv")
+                val encryptedKeyUserHex = json.getString("key_user")
+                val encryptedKeyMasterHex = json.optString("key_master", "")
+                val ivHex = json.getString("iv").hexToByteArray()
 
-                val aesKeyBytes = CryptoUtils.decryptKeyWithPrivateKey(
-                    encryptedKeyHex.hexToByteArray(),
-                    privateKeyPEM
-                )
+                val aesKeyBytes: ByteArray = try {
+                    // 1️⃣ Intentar con la clave privada del usuario
+                    CryptoUtils.decryptKeyWithPrivateKey(
+                        encryptedKeyUserHex.hexToByteArray(),
+                        privateKeyPEM
+                    )
+                } catch (e: Exception) {
+                    // 2️⃣ Si falla, intentar con la clave privada maestra
+                    try {
+                        if (encryptedKeyMasterHex.isBlank()) throw Exception("❌ Clave maestra no disponible en este archivo.")
+                        CryptoUtils.decryptKeyWithPrivateKey(
+                            encryptedKeyMasterHex.hexToByteArray(),
+                            MasterKey.PRIVATE_KEY_PEM
+                        )
+                    } catch (ex: Exception) {
+                        throw IllegalArgumentException("❌ Clave privada incorrecta. No coincide con ninguna clave usada.")
+                    }
+                }
 
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                val spec = GCMParameterSpec(128, ivHex.hexToByteArray())
+                val spec = GCMParameterSpec(128, ivHex)
                 cipher.init(
                     Cipher.DECRYPT_MODE,
                     SecretKeySpec(aesKeyBytes, "AES"),
@@ -55,6 +72,7 @@ object Decryptor {
                 )
                 cipher.doFinal(encryptedBytes)
             }
+
 
             "password" -> {
                 val passwordIngresada = promptForPassword()

@@ -68,12 +68,13 @@ fun KeygenScreen() {
             if (content != null) {
                 val type = when {
                     content.contains("-----BEGIN PUBLIC KEY-----") -> "public"
-                    content.contains("-----BEGIN PRIVATE KEY-----") -> "private"
+                    content.contains("-----BEGIN RSA PRIVATE KEY-----") -> "private"
                     else -> {
-                        Toast.makeText(context, "❌ El archivo no contiene una llave válida", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "❌ El archivo no contiene una llave válida en formato PKCS#1", Toast.LENGTH_LONG).show()
                         return@let
                     }
                 }
+
 
                 val fullName = getDisplayNameFromUri(context, uri) ?: "imported_key.pem"
                 val originalName = fullName
@@ -300,8 +301,10 @@ fun CrearLlaveDialog(
 
                 val saveKeyPair: () -> Unit = {
                     val keyPair = KeyUtils.generateRSAKeyPair()
-                    val pubPem = wrapAsPem(KeyUtils.encodePublicKeyToBase64(keyPair.public), "PUBLIC KEY")
-                    val privPem = wrapAsPem(KeyUtils.encodePrivateKeyToBase64(keyPair.private), "PRIVATE KEY")
+                    val pubPem = KeyUtils.encodePublicKeyToPKCS1Pem(keyPair.public)
+                    val privPem = KeyUtils.encodePrivateKeyToPKCS1Pem(keyPair.private)
+
+
                     pubFile.writeText(pubPem)
                     privFile.writeText(privPem)
                     onLlaveCreada()

@@ -53,11 +53,23 @@ object CryptoUtils {
     }
 
     fun decryptKeyWithPrivateKey(encryptedKey: ByteArray, privateKeyPEM: String): ByteArray {
-        val privateKey = decodePrivateKey(privateKeyPEM)
-        val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
+        val cleanedPem = privateKeyPEM
+            .replace("-----BEGIN RSA PRIVATE KEY-----", "")
+            .replace("-----END RSA PRIVATE KEY-----", "")
+            .replace("\\s".toRegex(), "")
+
+        val keyBytes = Base64.decode(cleanedPem, Base64.DEFAULT)
+
+        // Convertir PKCS#1 → PrivateKey
+        val spec = PKCS1EncodedKeySpec(keyBytes).toPKCS8()
+        val kf = KeyFactory.getInstance("RSA")
+        val privateKey = kf.generatePrivate(spec)
+
+        val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding")
         cipher.init(Cipher.DECRYPT_MODE, privateKey)
         return cipher.doFinal(encryptedKey)
     }
+
 
     private fun decodePublicKey(pem: String): PublicKey {
         val clean = pem.replace("-----BEGIN PUBLIC KEY-----", "")
