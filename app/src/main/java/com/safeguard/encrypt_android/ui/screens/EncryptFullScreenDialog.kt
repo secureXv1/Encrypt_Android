@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.safeguard.encrypt_android.crypto.CryptoUtils.validateRSAPublicKeyPem
 import com.safeguard.encrypt_android.utils.UuidUtils
 import com.safeguard.encrypt_android.utils.getFileNameFromUri
 import com.safeguard.encrypt_android.utils.shareFile
@@ -60,14 +61,15 @@ fun EncryptFullScreenDialog(
     var selectedKeyFile by remember { mutableStateOf<File?>(null) }
     var isEncrypting by remember { mutableStateOf(false) }
     val llavesDir = File(context.filesDir, "Llaves").apply { mkdirs() }
-    val keyFiles = remember {
-        llavesDir.listFiles()
-            ?.filter { it.extension == "pem" && it.readText().contains("-----BEGIN PUBLIC KEY-----") }
+
+    var keyFiles by remember { mutableStateOf(emptyList<File>()) }
+
+    LaunchedEffect(Unit) {
+        keyFiles = File(context.filesDir, "Llaves")
+            .listFiles()
+            ?.filter { it.extension == "pem" && it.readText().contains("-----BEGIN RSA PUBLIC KEY-----") }
             ?: emptyList()
     }
-
-
-
 
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -230,7 +232,8 @@ fun EncryptFullScreenDialog(
             }
 
             if (encryptionMethod == Encryptor.Metodo.RSA) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
                 KeySelectionSection(
                     keyFiles = keyFiles,
                     selectedKey = selectedKeyFile,
@@ -238,38 +241,24 @@ fun EncryptFullScreenDialog(
                 )
             }
 
+
+
+
             Spacer(Modifier.height(20.dp))
+
             Button(
                 onClick = {
-                    if (selectedFile == null) {
-                        Toast.makeText(context, "Seleccione un archivo", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-                    if (encryptionMethod == Encryptor.Metodo.PASSWORD && password != confirmPassword) {
-                        Toast.makeText(context, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
-                        return@Button
-                    }
-
-                    isEncrypting = true
-                    val resultFile = when (encryptionMethod) {
-                        Encryptor.Metodo.PASSWORD -> Encryptor.encryptWithPassword(selectedFile!!, password, userUuid)
-                        Encryptor.Metodo.RSA -> {
-                            val pem = selectedKeyFile?.readText()
-                            if (pem != null) Encryptor.encryptWithPublicKey(selectedFile!!, pem, userUuid)
-                            else null
-                        }
-                    }
-                    isEncrypting = false
-
-                    if (resultFile != null && resultFile.exists()) {
-                        Toast.makeText(context, "Archivo cifrado exitosamente", Toast.LENGTH_SHORT).show()
-                        onSuccess(resultFile)
-                    }
-
-
-
-
-
+                    handleEncryptClick(
+                        context = context,
+                        selectedFile = selectedFile,
+                        encryptionMethod = encryptionMethod,
+                        selectedKeyFile = selectedKeyFile,
+                        password = password,
+                        confirmPassword = confirmPassword,
+                        userUuid = userUuid,
+                        onSuccess = onSuccess,
+                        setIsEncrypting = { isEncrypting = it }
+                    )
                 },
                 enabled = !isEncrypting,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
@@ -282,11 +271,71 @@ fun EncryptFullScreenDialog(
 
 
 
+
+
+
         }
+
+
+
+
+
     }
 
 
 }
+
+private fun handleEncryptClick(
+    context: Context,
+    selectedFile: File?,
+    encryptionMethod: Encryptor.Metodo,
+    selectedKeyFile: File?,
+    password: String,
+    confirmPassword: String,
+    userUuid: String,
+    onSuccess: (File) -> Unit,
+    setIsEncrypting: (Boolean) -> Unit
+) {
+    if (selectedFile == null) {
+        Toast.makeText(context, "Seleccione un archivo", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    if (encryptionMethod == Encryptor.Metodo.PASSWORD && password != confirmPassword) {
+        Toast.makeText(context, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    if (encryptionMethod == Encryptor.Metodo.RSA) {
+        val pem = selectedKeyFile?.readText()
+        if (pem == null || !validateRSAPublicKeyPem(pem)) {
+            Toast.makeText(context, "❌ La llave pública seleccionada no es válida (PKCS#1)", Toast.LENGTH_LONG).show()
+            return
+        }
+    }
+
+    setIsEncrypting(true)
+
+    val resultFile = when (encryptionMethod) {
+        Encryptor.Metodo.PASSWORD -> Encryptor.encryptWithPassword(selectedFile!!, password, userUuid)
+        Encryptor.Metodo.RSA -> {
+            val pem = selectedKeyFile?.readText()
+            if (pem != null) Encryptor.encryptWithPublicKey(selectedFile!!, pem, userUuid)
+            else null
+        }
+    }
+
+    setIsEncrypting(false)
+
+    if (resultFile != null && resultFile.exists()) {
+        Toast.makeText(context, "Archivo cifrado exitosamente", Toast.LENGTH_SHORT).show()
+        onSuccess(resultFile)
+    }
+}
+
+
+
+
 
 
 

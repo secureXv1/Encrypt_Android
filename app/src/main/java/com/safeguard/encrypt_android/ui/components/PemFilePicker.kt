@@ -37,7 +37,9 @@ fun PemFilePicker(
         } else {
             LazyColumn {
                 items(pemFiles) { file ->
-                    val isPrivate = remember(file) { file.readText().contains("-----BEGIN PRIVATE KEY-----") }
+                    val isPrivate = remember(file) {
+                        file.readText().contains("-----BEGIN RSA PRIVATE KEY-----")
+                    }
 
                     Row(
                         modifier = Modifier
@@ -63,3 +65,4 @@ fun PemFilePicker(
         }
     }
 }
+

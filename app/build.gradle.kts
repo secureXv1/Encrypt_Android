@@ -9,6 +9,23 @@ android {
     namespace = "com.safeguard.endcrypt_android"
     compileSdk = 35
 
+    packagingOptions {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/ASL2.0",
+                "META-INF/*.kotlin_module"
+            )
+        }
+    }
+
+
+
     defaultConfig {
         applicationId = "com.safeguard.endcrypt_android"
         minSdk = 24
@@ -73,8 +90,7 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
 
-    // Cifrado
-    implementation("org.bouncycastle:bcprov-jdk15on:1.70")
+
 
     // Tests
     testImplementation(libs.junit)
@@ -92,6 +108,9 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("me.saket.swipe:swipe:1.0.0")
+    implementation("org.bouncycastle:bcprov-jdk15to18:1.77")
+
+
 
 
 
