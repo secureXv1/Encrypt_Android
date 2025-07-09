@@ -40,19 +40,7 @@ object CryptoUtils {
         return SecretKeySpec(secret.encoded, "AES")
     }
 
-    // ✅ NUEVO: Descifrado con AES-GCM usando contraseña derivada
-    fun decryptWithPasswordGCM(
-        encryptedData: ByteArray,
-        salt: ByteArray,
-        password: String,
-        iv: ByteArray
-    ): ByteArray {
-        val secretKey = deriveKeyFromPassword(password, salt)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val spec = GCMParameterSpec(128, iv)
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
-        return cipher.doFinal(encryptedData)
-    }
+
 
     fun encryptKeyWithPublicKey(secretKey: ByteArray, publicKeyPEM: String): ByteArray {
         val publicKey = decodeRSAPublicKeyPKCS1(publicKeyPEM)
@@ -78,23 +66,6 @@ object CryptoUtils {
     }
 
 
-    private fun decodePublicKey(pem: String): PublicKey {
-        val clean = pem.replace("-----BEGIN PUBLIC KEY-----", "")
-            .replace("-----END PUBLIC KEY-----", "")
-            .replace("\\s".toRegex(), "")
-        val bytes = Base64.decode(clean, Base64.DEFAULT)
-        val spec = X509EncodedKeySpec(bytes)
-        return KeyFactory.getInstance("RSA").generatePublic(spec)
-    }
-
-    private fun decodePrivateKey(pem: String): PrivateKey {
-        val clean = pem.replace("-----BEGIN PRIVATE KEY-----", "")
-            .replace("-----END PRIVATE KEY-----", "")
-            .replace("\\s".toRegex(), "")
-        val bytes = Base64.decode(clean, Base64.DEFAULT)
-        val spec = PKCS8EncodedKeySpec(bytes)
-        return KeyFactory.getInstance("RSA").generatePrivate(spec)
-    }
 
     // ❌ OPCIONAL: Ya no se necesita si solo se usa GCM
     @Deprecated("Usa GCM en lugar de CBC", ReplaceWith("decryptWithPasswordGCM(...)"))
@@ -163,6 +134,10 @@ object CryptoUtils {
             false
         }
     }
+
+    // ✅ Extensión para convertir ByteArray a Hexadecimal (requerido por formato Windows)
+    fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
+
 
 
 

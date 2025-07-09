@@ -98,7 +98,8 @@ fun DecryptScreen() {
                     if (showPemPicker) {
                         PemFilePicker(
                             context = context,
-                            filter = { it.readText().contains("-----BEGIN PRIVATE KEY-----") }
+                            filter = { it.readText().contains("-----BEGIN RSA PRIVATE KEY-----") }
+
                         ) { _, pemContent ->
 
                         try {

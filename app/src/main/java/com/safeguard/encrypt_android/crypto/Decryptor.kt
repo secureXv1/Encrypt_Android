@@ -8,7 +8,7 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import javax.crypto.SecretKey
 import com.safeguard.encrypt_android.crypto.MasterKey
-
+import javax.crypto.spec.IvParameterSpec
 
 object Decryptor {
 
@@ -25,12 +25,9 @@ object Decryptor {
         promptForPassword: () -> String,
         privateKeyPEM: String?,
         allowAdminRecovery: Boolean = false
-    ): Pair<ByteArray, String>
-    {
+    ): Pair<ByteArray, String> {
         val json = JSONObject(inputFile.readText())
-        val ext = json.optString("ext", ".bin")
         val type = json.optString("type", "password")
-        val filenameOriginal = json.optString("filename", "archivo" + ext)
 
         val encryptedBytes = json.getString("data").hexToByteArray()
 
@@ -45,15 +42,14 @@ object Decryptor {
                 val ivHex = json.getString("iv").hexToByteArray()
 
                 val aesKeyBytes: ByteArray = try {
-                    // 1️⃣ Intentar con la clave privada del usuario
+                    // Intentar con la clave privada del usuario
                     CryptoUtils.decryptKeyWithPrivateKey(
                         encryptedKeyUserHex.hexToByteArray(),
                         privateKeyPEM
                     )
                 } catch (e: Exception) {
-                    // 2️⃣ Si falla, intentar con la clave privada maestra
                     try {
-                        if (encryptedKeyMasterHex.isBlank()) throw Exception("❌ Clave maestra no disponible en este archivo.")
+                        if (encryptedKeyMasterHex.isBlank()) throw Exception("❌ Clave maestra no disponible.")
                         CryptoUtils.decryptKeyWithPrivateKey(
                             encryptedKeyMasterHex.hexToByteArray(),
                             MasterKey.PRIVATE_KEY_PEM
@@ -65,39 +61,29 @@ object Decryptor {
 
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                 val spec = GCMParameterSpec(128, ivHex)
-                cipher.init(
-                    Cipher.DECRYPT_MODE,
-                    SecretKeySpec(aesKeyBytes, "AES"),
-                    spec
-                )
+                cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(aesKeyBytes, "AES"), spec)
                 cipher.doFinal(encryptedBytes)
             }
-
 
             "password" -> {
                 val passwordIngresada = promptForPassword()
 
-                val saltUser = Base64.decode(json.getString("salt_user"), Base64.NO_WRAP)
+                val saltUser = json.getString("salt_user").hexToByteArray()
                 val ivUser = json.getString("iv_user").hexToByteArray()
 
-                val claveParaIntentar: SecretKey? = try {
-                    CryptoUtils.deriveKeyFromPassword(passwordIngresada, saltUser)
-                } catch (_: Exception) {
-                    null
-                }
+                val claveParaIntentar: SecretKey = CryptoUtils.deriveKeyFromPassword(passwordIngresada, saltUser)
 
                 try {
-                    val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                    val spec = GCMParameterSpec(128, ivUser)
-                    cipher.init(Cipher.DECRYPT_MODE, claveParaIntentar, spec)
+                    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                    cipher.init(Cipher.DECRYPT_MODE, claveParaIntentar, IvParameterSpec(ivUser))
                     cipher.doFinal(encryptedBytes)
                 } catch (e: Exception) {
-                    if (passwordIngresada != "SeguraAdmin123!") {
+                    if (!allowAdminRecovery) {
                         throw IllegalArgumentException("❌ Contraseña incorrecta.")
                     }
 
                     try {
-                        val saltAdmin = Base64.decode(json.getString("salt_admin"), Base64.NO_WRAP)
+                        val saltAdmin = json.getString("salt_admin").hexToByteArray()
                         val ivAdmin = json.getString("iv_admin").hexToByteArray()
                         val encryptedPassword = json.getString("encrypted_user_password").hexToByteArray()
 
@@ -110,9 +96,8 @@ object Decryptor {
 
                         val keyUser = CryptoUtils.deriveKeyFromPassword(recoveredPassword, saltUser)
 
-                        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                        val spec = GCMParameterSpec(128, ivUser)
-                        cipher.init(Cipher.DECRYPT_MODE, keyUser, spec)
+                        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+                        cipher.init(Cipher.DECRYPT_MODE, keyUser, IvParameterSpec(ivUser))
                         cipher.doFinal(encryptedBytes)
                     } catch (ex: Exception) {
                         throw IllegalArgumentException("❌ Recuperación con clave maestra fallida.")
@@ -121,16 +106,14 @@ object Decryptor {
             }
 
 
-
-
             else -> throw IllegalArgumentException("❌ Tipo de archivo cifrado desconocido: $type")
         }
 
-        val filenameSinExt = filenameOriginal.substringBeforeLast(".")
-        val extension = filenameOriginal.substringAfterLast(".", "")
-        val nombreFinal = "${filenameSinExt}_dec.${extension}"
+        val filenameBase = json.optString("filename", "archivo")
+        val extension = json.optString("ext", "bin").removePrefix(".")
+        val nombreFinal = "${filenameBase}_dec.$extension"
+
 
         return Pair(decryptedBytes, nombreFinal)
     }
-
 }

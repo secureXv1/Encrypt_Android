@@ -240,13 +240,6 @@ fun KeygenScreen() {
     }
 }
 
-fun wrapAsPem(base64: String, label: String): String {
-    return buildString {
-        appendLine("-----BEGIN $label-----")
-        appendLine(base64.chunked(64).joinToString("\n"))
-        appendLine("-----END $label-----")
-    }
-}
 
 fun sharePemFile(context: Context, file: File) {
     try {
