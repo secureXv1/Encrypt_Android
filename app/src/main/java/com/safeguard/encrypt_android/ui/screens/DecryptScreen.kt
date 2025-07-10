@@ -1,231 +1,140 @@
 package com.safeguard.encrypt_android.ui.screens
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.safeguard.encrypt_android.crypto.CryptoController
 import com.safeguard.encrypt_android.ui.components.PemFilePicker
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DecryptScreen() {
     val context = LocalContext.current
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedName by remember { mutableStateOf("ninguno") }
-    var password by remember { mutableStateOf("") }
-    var resultMessage by remember { mutableStateOf("") }
-    var showPemPicker by remember { mutableStateOf(false) }
-    var isJsonFile by remember { mutableStateOf(false) }
-    var type by remember { mutableStateOf<String?>(null) }
+    val decryptedDir = File(context.filesDir, "EncryptApp/Decrypted").apply { mkdirs() }
+    var archivos by remember { mutableStateOf(listarArchivos(decryptedDir)) }
+    var showDialog by remember { mutableStateOf(false) }
 
-    val pickFile = rememberLauncherForActivityResult(OpenDocument()) { uri ->
-        selectedUri = uri
-        selectedName = uri?.lastPathSegment ?: "ninguno"
-        password = ""
-        resultMessage = ""
-        showPemPicker = false
-        type = null
-
-        uri?.let {
-            val input = context.contentResolver.openInputStream(it)?.readBytes()
-            if (input != null) {
-                val content = String(input)
-                isJsonFile = content.trim().startsWith("{")
-                if (isJsonFile) {
-                    type = Regex("\"type\"\\s*:\\s*\"(password|rsa)\"").find(content)?.groupValues?.get(1)
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text("Archivos Descifrados") },
+            actions = {
+                IconButton(onClick = { showDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "Nuevo descifrado")
                 }
             }
-        }
-    }
+        )
 
-    Column(Modifier.padding(16.dp)) {
-        Text("🛠️ Extraer o Descifrar", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(12.dp))
-
-        Button(onClick = { pickFile.launch(arrayOf("*/*")) }) {
-            Text("📁 Seleccionar archivo")
-        }
-
-        Text("Archivo seleccionado: $selectedName")
-
-        selectedUri?.let { uri ->
-            Spacer(Modifier.height(12.dp))
-
-            if (isJsonFile && type != null) {
-                if (type == "password") {
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("Contraseña") },
-                        modifier = Modifier.fillMaxWidth()
+        if (archivos.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No hay archivos descifrados")
+            }
+        } else {
+            LazyColumn {
+                items(archivos, key = { it.name }) { archivo ->
+                    FileCardItem(
+                        file = archivo,
+                        onDelete = {
+                            archivo.delete()
+                            archivos = listarArchivos(decryptedDir)
+                        },
+                        onShare = {
+                            compartirArchivo(context, archivo)
+                        },
+                        onDownload = {
+                            descargarArchivo(context, archivo)
+                        }
                     )
-                    Spacer(Modifier.height(8.dp))
-
-                    Button(onClick = {
-                        try {
-                            val input = context.contentResolver.openInputStream(uri)!!.readBytes()
-                            val temp = File.createTempFile("descifrar", ".json", context.cacheDir)
-                            temp.writeBytes(input)
-
-                            val outputFile = CryptoController.decrypt(
-                                inputFile = temp,
-                                promptForPassword = { password },
-                                privateKeyPEM = null,
-                                allowAdminRecovery = true
-                            )
-
-                            resultMessage = "✅ Descifrado en: ${outputFile.absolutePath}"
-                            Toast.makeText(context, "Archivo descifrado", Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            resultMessage = "❌ Error: ${e.message}"
-                        }
-                    }) {
-                        Text("🔓 Descifrar con contraseña")
-                    }
-                } else if (type == "rsa") {
-                    Button(onClick = { showPemPicker = true }) {
-                        Text("🔑 Descifrar con clave privada (.pem)")
-                    }
-
-                    if (showPemPicker) {
-                        PemFilePicker(
-                            context = context,
-                            filter = { it.readText().contains("-----BEGIN RSA PRIVATE KEY-----") }
-
-                        ) { _, pemContent ->
-
-                        try {
-                                val input = context.contentResolver.openInputStream(uri)!!.readBytes()
-                                val temp = File.createTempFile("descifrar", ".json", context.cacheDir)
-                                temp.writeBytes(input)
-
-                                val outputFile = CryptoController.decrypt(
-                                    inputFile = temp,
-                                    promptForPassword = { "" },
-                                    privateKeyPEM = pemContent
-                                )
-
-                                resultMessage = "✅ Descifrado con clave: ${outputFile.absolutePath}"
-                                Toast.makeText(context, "Archivo descifrado con clave", Toast.LENGTH_SHORT).show()
-                            } catch (e: Exception) {
-                                resultMessage = "❌ Error: ${e.message}"
-                            } finally {
-                                showPemPicker = false
-                            }
-                        }
-                    }
                 }
-            } else {
-                // ARCHIVO OCULTO: Extraer .json y permitir descifrar
-                Button(onClick = {
-                    try {
-                        val raw = context.contentResolver.openInputStream(uri)!!.readBytes()
-                        val parts = raw.toString(Charsets.ISO_8859_1).split("<<--BETTY_START-->>")
-                        if (parts.size != 2) throw Exception("Contenido oculto no encontrado")
+            }
+        }
 
-                        val outputDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android").apply { mkdirs() }
-                        val extractedFile = File(outputDir, "extraido.json")
-                        extractedFile.writeBytes(parts[1].toByteArray(Charsets.ISO_8859_1))
-
-                        resultMessage = "✅ Extraído en: ${extractedFile.absolutePath}"
-                        Toast.makeText(context, "Archivo extraído", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        resultMessage = "❌ Error: ${e.message}"
-                    }
-                }) {
-                    Text("📤 Solo extraer")
+        if (showDialog) {
+            DecryptFullScreenDialog(
+                onClose = {
+                    showDialog = false
+                    archivos = listarArchivos(decryptedDir)
                 }
+            )
+        }
+    }
+}
 
-                Spacer(Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Contraseña para descifrar") },
-                    modifier = Modifier.fillMaxWidth()
+@Composable
+fun FileCardItem(
+    file: File,
+    onDelete: () -> Unit,
+    onShare: () -> Unit,
+    onDownload: () -> Unit
+) {
+    Card(modifier = Modifier
+        .fillMaxWidth()
+        .padding(8.dp)) {
+        ListItem(
+            overlineContent = null,
+            headlineContent = { Text(file.name) },
+            supportingContent = {
+                Text(
+                    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                        .format(file.lastModified())
                 )
-
-                Button(onClick = {
-                    try {
-                        val raw = context.contentResolver.openInputStream(uri)!!.readBytes()
-                        val parts = raw.toString(Charsets.ISO_8859_1).split("<<--BETTY_START-->>")
-                        if (parts.size != 2) throw Exception("Contenido oculto no encontrado")
-
-                        val outputDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android").apply { mkdirs() }
-                        val encryptedJson = File(outputDir, "extraido.json")
-                        encryptedJson.writeBytes(parts[1].toByteArray(Charsets.ISO_8859_1))
-
-                        val temp = File.createTempFile("descifrar", ".json", context.cacheDir)
-                        temp.writeBytes(parts[1].toByteArray(Charsets.ISO_8859_1))
-
-                        val outputFile = CryptoController.decrypt(
-                            inputFile = temp,
-                            promptForPassword = { password },
-                            privateKeyPEM = null,
-                            allowAdminRecovery = true
-                        )
-
-                        resultMessage = "✅ Extraído y descifrado en: ${outputFile.absolutePath}"
-                        Toast.makeText(context, "Extraído y descifrado", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        resultMessage = "❌ Error: ${e.message}"
+            },
+            trailingContent = {
+                Row {
+                    IconButton(onClick = onDownload) {
+                        Icon(Icons.Default.Download, contentDescription = "Descargar")
                     }
-                }) {
-                    Text("📤 Extraer y descifrar con contraseña")
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Button(onClick = { showPemPicker = true }) {
-                    Text("🔑 Extraer y descifrar con clave privada")
-                }
-
-                if (showPemPicker) {
-                    PemFilePicker(
-                        context = context,
-                        filter = { it.readText().contains("-----BEGIN PRIVATE KEY-----") }
-                    ) { _, pemContent ->
-
-                    try {
-                            val raw = context.contentResolver.openInputStream(uri)!!.readBytes()
-                            val parts = raw.toString(Charsets.ISO_8859_1).split("<<--BETTY_START-->>")
-                            if (parts.size != 2) throw Exception("Contenido oculto no encontrado")
-
-                            val outputDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Encrypt_Android").apply { mkdirs() }
-                            val encryptedJson = File(outputDir, "extraido.json")
-                            encryptedJson.writeBytes(parts[1].toByteArray(Charsets.ISO_8859_1))
-
-                            val temp = File.createTempFile("descifrar", ".json", context.cacheDir)
-                            temp.writeBytes(parts[1].toByteArray(Charsets.ISO_8859_1))
-
-                            val outputFile = CryptoController.decrypt(
-                                inputFile = temp,
-                                promptForPassword = { "" },
-                                privateKeyPEM = pemContent,
-                                allowAdminRecovery = true
-                            )
-
-                            resultMessage = "✅ Extraído y descifrado con clave: ${outputFile.absolutePath}"
-                            Toast.makeText(context, "Extraído y descifrado con clave", Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            resultMessage = "❌ Error con clave: ${e.message}"
-                        } finally {
-                            showPemPicker = false
-                        }
+                    IconButton(onClick = onShare) {
+                        Icon(Icons.Default.Share, contentDescription = "Compartir")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar")
                     }
                 }
             }
+        )
 
-            Spacer(Modifier.height(16.dp))
-            Text(resultMessage, style = MaterialTheme.typography.bodyMedium)
-        }
     }
+}
+
+fun listarArchivos(dir: File): List<File> =
+    dir.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() } ?: emptyList()
+
+fun compartirArchivo(context: Context, archivo: File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", archivo)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "*/*"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartir archivo"))
+}
+
+fun descargarArchivo(context: Context, archivo: File) {
+    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+    val destino = File(downloadsDir, archivo.name)
+    archivo.copyTo(destino, overwrite = true)
+    Toast.makeText(context, "Guardado en Descargas", Toast.LENGTH_SHORT).show()
 }
