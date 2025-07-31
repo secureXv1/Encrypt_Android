@@ -1,14 +1,13 @@
 package com.safeguard.encrypt_android.crypto
 
+import android.util.Base64
 import android.util.Log
 import org.json.JSONObject
 import java.io.File
-import java.security.spec.AlgorithmParameterSpec
 import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-
-
 
 object Decryptor {
     @OptIn(ExperimentalStdlibApi::class)
@@ -21,6 +20,7 @@ object Decryptor {
         val json = JSONObject(inputFile.readText())
         val type = json.optString("type", "password")
         val encryptedBytes = json.getString("data").hexToByteArray()
+        Log.d("Decryptor", "🔍 Primeros 32 bytes de 'data': ${encryptedBytes.take(32).joinToString(" ") { "%02x".format(it) }}")
 
         val decryptedBytes = when (type.lowercase()) {
             "rsa" -> {
@@ -30,7 +30,9 @@ object Decryptor {
 
                 val encryptedKeyUser = json.getString("key_user").hexToByteArray()
                 val iv = json.getString("iv").hexToByteArray()
-                val keyBytes: ByteArray = try {
+                Log.d("Decryptor", "🔐 [RSA] IV length: ${iv.size}, Data length: ${encryptedBytes.size}")
+
+                val keyBytes = try {
                     CryptoUtils.decryptKeyWithPrivateKey(encryptedKeyUser, privateKeyPEM)
                 } catch (e: Exception) {
                     val encryptedKeyMaster = json.optString("key_master", "")
@@ -43,23 +45,47 @@ object Decryptor {
                     )
                 }
 
-                val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                val ivSpec = IvParameterSpec(iv)
-                cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), ivSpec)
-                cipher.doFinal(encryptedBytes)
+                // ✅ Separar ciphertext y tag
+                val tagLength = 16
+                if (encryptedBytes.size <= tagLength) {
+                    throw IllegalArgumentException("❌ Archivo corrupto: datos demasiado cortos para GCM.")
+                }
+
+                val ciphertext = encryptedBytes.copyOfRange(0, encryptedBytes.size - tagLength)
+                val tag = encryptedBytes.copyOfRange(encryptedBytes.size - tagLength, encryptedBytes.size)
+                val fullCombined = ciphertext + tag
+
+                Log.d("Decryptor", "📦 Ciphertext: ${ciphertext.size}, Tag: ${tag.size}, Combined: ${fullCombined.size}")
+
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                val gcmSpec = GCMParameterSpec(128, iv)
+                cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), gcmSpec)
+                cipher.doFinal(fullCombined)
             }
+
 
             "password" -> {
                 val password = promptForPassword()
                 val saltUser = json.getString("salt_user").hexToByteArray()
                 val ivUser = json.getString("iv_user").hexToByteArray()
-                val userKey = CryptoUtils.deriveKeyFromPassword(password, saltUser)
+                Log.d("Decryptor", "🔐 [PWD] IV length: ${ivUser.size}, Data length: ${encryptedBytes.size}")
+
+                val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser)
 
                 try {
-                    Log.d("Decryptor", "🔓 Intentando descifrado con contraseña proporcionada...")
-                    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                    cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(userKey.encoded, "AES"), IvParameterSpec(ivUser))
-                    cipher.doFinal(encryptedBytes)
+                    val tagLength = 16
+                    if (encryptedBytes.size <= tagLength) {
+                        throw IllegalArgumentException("❌ Archivo corrupto: datos demasiado cortos para GCM.")
+                    }
+
+                    val ciphertext = encryptedBytes.copyOfRange(0, encryptedBytes.size - tagLength)
+                    val tag = encryptedBytes.copyOfRange(encryptedBytes.size - tagLength, encryptedBytes.size)
+                    val fullCombined = ciphertext + tag
+
+                    val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                    cipher.init(Cipher.DECRYPT_MODE, keyUser, GCMParameterSpec(128, ivUser))
+                    cipher.doFinal(fullCombined)
+
                 } catch (e: Exception) {
                     Log.e("Decryptor", "❌ Descifrado con contraseña falló: ${e.message}")
                     if (!allowAdminRecovery) throw IllegalArgumentException("❌ Contraseña incorrecta.")
@@ -69,11 +95,11 @@ object Decryptor {
                         val ivAdmin = json.getString("iv_admin").hexToByteArray()
                         val encryptedPassword = json.getString("encrypted_user_password").hexToByteArray()
 
-                        val adminKey = CryptoUtils.deriveKeyFromPassword("SeguraAdmin123!", saltAdmin)
+                        val keyAdmin = CryptoUtils.deriveKeyFromPassword("SeguraAdmin123!", saltAdmin)
                         val cipherAdmin = Cipher.getInstance("AES/CBC/PKCS5Padding")
                         cipherAdmin.init(
                             Cipher.DECRYPT_MODE,
-                            SecretKeySpec(adminKey.encoded, "AES"),
+                            SecretKeySpec(keyAdmin.encoded, "AES"),
                             IvParameterSpec(ivAdmin)
                         )
 
@@ -81,9 +107,20 @@ object Decryptor {
                         Log.d("Decryptor", "✅ Contraseña recuperada: $recoveredPassword")
 
                         val recoveredKey = CryptoUtils.deriveKeyFromPassword(recoveredPassword, saltUser)
-                        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-                        cipher.init(Cipher.DECRYPT_MODE, recoveredKey, IvParameterSpec(ivUser))
-                        cipher.doFinal(encryptedBytes)
+
+                        val tagLength = 16
+                        if (encryptedBytes.size <= tagLength) {
+                            throw IllegalArgumentException("❌ Archivo corrupto: datos demasiado cortos para GCM.")
+                        }
+
+                        val ciphertext = encryptedBytes.copyOfRange(0, encryptedBytes.size - tagLength)
+                        val tag = encryptedBytes.copyOfRange(encryptedBytes.size - tagLength, encryptedBytes.size)
+                        val fullCombined = ciphertext + tag
+
+                        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                        cipher.init(Cipher.DECRYPT_MODE, recoveredKey, GCMParameterSpec(128, ivUser))
+                        cipher.doFinal(fullCombined)
+
                     } catch (ex: Exception) {
                         Log.e("Decryptor", "❌ Recuperación con clave maestra fallida: ${ex.message}")
                         throw IllegalArgumentException("❌ No se pudo recuperar la contraseña.")
@@ -91,12 +128,24 @@ object Decryptor {
                 }
             }
 
+
             else -> throw IllegalArgumentException("❌ Tipo de archivo no soportado: $type")
         }
 
-        val filename = json.optString("filename", "archivo")
-        val ext = json.optString("ext", "bin").removePrefix(".")
-        val suggestedName = "${filename}_dec.$ext"
-        return Pair(decryptedBytes, suggestedName)
+        // 🔍 Extraer si el contenido es JSON base64
+        val resultadoFinal: Pair<ByteArray, String> = try {
+            val interno = JSONObject(String(decryptedBytes))
+            val nombre = interno.optString("filename", "archivo")
+            val base64 = interno.optString("content", "")
+            val ext = interno.optString("ext", ".bin").removePrefix(".")
+            val decoded = Base64.decode(base64, Base64.NO_WRAP)
+            Pair(decoded, "$nombre.dec.$ext")
+        } catch (_: Exception) {
+            val filename = json.optString("filename", "archivo")
+            val ext = json.optString("ext", "bin").removePrefix(".")
+            Pair(decryptedBytes, "${filename}_dec.$ext")
+        }
+
+        return resultadoFinal
     }
 }

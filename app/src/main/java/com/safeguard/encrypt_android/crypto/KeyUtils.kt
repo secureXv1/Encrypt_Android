@@ -62,4 +62,58 @@ object KeyUtils {
             -----END $title-----
         """.trimIndent()
     }
+
+    fun pemToPkcs8(pem: String): ByteArray {
+        val base64 = pem
+            .replace("-----BEGIN RSA PUBLIC KEY-----", "")
+            .replace("-----END RSA PUBLIC KEY-----", "")
+            .replace("-----BEGIN PUBLIC KEY-----", "")
+            .replace("-----END PUBLIC KEY-----", "")
+            .replace("\\s".toRegex(), "")
+
+        val raw = Base64.decode(base64, Base64.DEFAULT)
+
+        return if (pem.contains("RSA PUBLIC KEY")) {
+            wrapPkcs1ToPkcs8(raw)
+        } else {
+            raw
+        }
+    }
+
+    fun wrapPkcs1ToPkcs8(pkcs1: ByteArray): ByteArray {
+        val rsaOid: ByteArray = byteArrayOf(
+            0x30, 0x0D,
+            0x06, 0x09,
+            0x2A, 0x86.toByte(), 0x48, 0x86.toByte(), 0xF7.toByte(), 0x0D, 0x01, 0x01, 0x01, // rsaEncryption OID
+            0x05, 0x00 // NULL
+        )
+
+        val bitString: ByteArray = byteArrayOf(0x00) + pkcs1
+        val bitStringLength = encodeLength(bitString.size)
+        val bitStringSeq = byteArrayOf(0x03) + bitStringLength + bitString
+
+        val totalSeq = rsaOid + bitStringSeq
+        val totalSeqLength = encodeLength(totalSeq.size)
+
+        return byteArrayOf(0x30) + totalSeqLength + totalSeq
+    }
+
+    private fun encodeLength(length: Int): ByteArray {
+        return if (length < 128) {
+            byteArrayOf(length.toByte())
+        } else {
+            val bytes = mutableListOf<Byte>()
+            var temp = length
+            while (temp > 0) {
+                bytes.add(0, (temp and 0xFF).toByte())
+                temp = temp shr 8
+            }
+            byteArrayOf((0x80 or bytes.size).toByte()) + bytes.toByteArray()
+        }
+    }
+
+
+
+
+
 }

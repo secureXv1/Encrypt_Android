@@ -18,7 +18,6 @@ import javax.crypto.spec.SecretKeySpec
 import org.bouncycastle.asn1.pkcs.RSAPrivateKey as BcRSAPrivateKey
 import org.bouncycastle.asn1.pkcs.RSAPublicKey as BcRSAPublicKey
 
-
 object CryptoUtils {
 
     fun generateAESKey(): SecretKey {
@@ -40,34 +39,33 @@ object CryptoUtils {
         return SecretKeySpec(secret.encoded, "AES")
     }
 
+    fun encryptKeyWithPublicKey(aesKey: ByteArray, pem: String): ByteArray {
+        val publicKey = if (pem.contains("-----BEGIN RSA PUBLIC KEY-----")) {
+            decodeRSAPublicKeyPKCS1(pem)
+        } else {
+            val cleaned = pem
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replace(Regex("\\s"), "")
+            val keyBytes = Base64.decode(cleaned, Base64.DEFAULT)
+            KeyFactory.getInstance("RSA").generatePublic(X509EncodedKeySpec(keyBytes))
+        }
 
-
-    fun encryptKeyWithPublicKey(secretKey: ByteArray, publicKeyPEM: String): ByteArray {
-        val publicKey = decodeRSAPublicKeyPKCS1(publicKeyPEM)
         val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
         cipher.init(Cipher.ENCRYPT_MODE, publicKey)
-        return cipher.doFinal(secretKey)
+        return cipher.doFinal(aesKey)
     }
+
+
+
+
     fun decryptKeyWithPrivateKey(encryptedKey: ByteArray, privateKeyPEM: String): ByteArray {
-        val cleanedPem = privateKeyPEM
-            .replace("-----BEGIN RSA PRIVATE KEY-----", "")
-            .replace("-----END RSA PRIVATE KEY-----", "")
-            .replace("\\s".toRegex(), "")
-
-        val keyBytes = Base64.decode(cleanedPem, Base64.DEFAULT)
-
-        // Convertir PKCS#1 → PrivateKey
         val privateKey = decodeRSAPrivateKeyPKCS1(privateKeyPEM)
-
-
         val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding")
         cipher.init(Cipher.DECRYPT_MODE, privateKey)
         return cipher.doFinal(encryptedKey)
     }
 
-
-
-    // ❌ OPCIONAL: Ya no se necesita si solo se usa GCM
     @Deprecated("Usa GCM en lugar de CBC", ReplaceWith("decryptWithPasswordGCM(...)"))
     fun decryptWithPassword(
         encryptedData: ByteArray,
@@ -87,24 +85,11 @@ object CryptoUtils {
             .replace("-----END RSA PUBLIC KEY-----", "")
             .replace("\\s".toRegex(), "")
 
-        val bytes = try {
-            Base64.decode(cleaned, Base64.NO_WRAP)
-        } catch (e: Exception) {
-            throw IllegalArgumentException("❌ La llave no está codificada en Base64 correctamente")
-        }
-
-        val bcKey = try {
-            BcRSAPublicKey.getInstance(ASN1Primitive.fromByteArray(bytes))
-        } catch (e: Exception) {
-            e.printStackTrace()
-            throw IllegalArgumentException("❌ Formato PKCS#1 inválido: ${e.message}")
-        }
-
+        val bytes = Base64.decode(cleaned, Base64.NO_WRAP)
+        val bcKey = BcRSAPublicKey.getInstance(ASN1Primitive.fromByteArray(bytes))
         val spec = RSAPublicKeySpec(bcKey.modulus, bcKey.publicExponent)
         return KeyFactory.getInstance("RSA").generatePublic(spec)
     }
-
-
 
     fun decodeRSAPrivateKeyPKCS1(pem: String): PrivateKey {
         val cleanPem = pem
@@ -124,10 +109,10 @@ object CryptoUtils {
             val cleaned = pem
                 .replace("-----BEGIN RSA PUBLIC KEY-----", "")
                 .replace("-----END RSA PUBLIC KEY-----", "")
-                .replace(Regex("\\s"), "") // quita todos los espacios, tabs y saltos
+                .replace("\\s".toRegex(), "")
 
             val bytes = Base64.decode(cleaned, Base64.DEFAULT)
-            BcRSAPublicKey.getInstance(ASN1Primitive.fromByteArray(bytes)) // si falla aquí, no es válida
+            BcRSAPublicKey.getInstance(ASN1Primitive.fromByteArray(bytes))
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -135,14 +120,13 @@ object CryptoUtils {
         }
     }
 
-    // ✅ Extensión para convertir ByteArray a Hexadecimal (requerido por formato Windows)
     fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
 
-
-
-
-
-
-
+    fun convertPkcs1ToPkcs8UsingBC(pkcs1: ByteArray): ByteArray {
+        val spec = BcRSAPublicKey.getInstance(ASN1Primitive.fromByteArray(pkcs1))
+        val rsaSpec = RSAPublicKeySpec(spec.modulus, spec.publicExponent)
+        val publicKey = KeyFactory.getInstance("RSA").generatePublic(rsaSpec)
+        return publicKey.encoded // Esta es la forma correcta y segura
+    }
 
 }

@@ -44,42 +44,54 @@ object Encryptor {
 
 
     fun encryptWithPassword(inputFile: File, password: String, userUuid: String): File {
-        // 1. Salts e IVs (16 bytes para CBC)
+        // 🔹1. Empaquetar archivo como JSON base64
+        val fileBytes = inputFile.readBytes()
+        val base64Content = Base64.encodeToString(fileBytes, Base64.NO_WRAP)
+
+        val payload = JSONObject().apply {
+            put("filename", inputFile.name)
+            put("ext", ".${inputFile.extension}")
+            put("content", base64Content)
+        }
+        val payloadBytes = payload.toString().toByteArray(Charsets.UTF_8)
+
+        // 🔹2. Generar salt e IVs
         val saltUser = CryptoUtils.generateRandomBytes(16)
         val saltAdmin = CryptoUtils.generateRandomBytes(16)
-        val ivUser = CryptoUtils.generateRandomBytes(16)
-        val ivAdmin = CryptoUtils.generateRandomBytes(12) // GCM requiere 12 bytes
+        val ivUser = CryptoUtils.generateRandomBytes(12)  // GCM usa 12 bytes
+        val ivAdmin = CryptoUtils.generateRandomBytes(16) // CBC usa 16 bytes
 
-        // 2. Derivación de claves
-        val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser) // 32 bytes
+        // 🔹3. Derivar claves
+        val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser)
         val keyAdmin = CryptoUtils.deriveKeyFromPassword("SeguraAdmin123!", saltAdmin)
 
-        // 3. Cifrado con AES-CBC (igual que Windows)
-        val cipherUser = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipherUser.init(Cipher.ENCRYPT_MODE, keyUser, IvParameterSpec(ivUser))
-        val encryptedContent = cipherUser.doFinal(inputFile.readBytes())
+        // 🔹4. Cifrar archivo con AES-GCM
+        val cipherGCM = Cipher.getInstance("AES/GCM/NoPadding")
+        val gcmSpec = GCMParameterSpec(128, ivUser)
+        cipherGCM.init(Cipher.ENCRYPT_MODE, keyUser, gcmSpec)
+        val cipherText = cipherGCM.doFinal(payloadBytes) // incluye tag al final
 
-        // 4. Cifrado de la contraseña con clave admin (AES-GCM)
-        val cipherAdmin = Cipher.getInstance("AES/GCM/NoPadding")
-        cipherAdmin.init(Cipher.ENCRYPT_MODE, keyAdmin, GCMParameterSpec(128, ivAdmin))
-        val sealed = cipherAdmin.doFinal(password.toByteArray(Charsets.UTF_8))
+        // 🔹5. Cifrar contraseña con AES-CBC para administrador
+        val cipherAdmin = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipherAdmin.init(Cipher.ENCRYPT_MODE, keyAdmin, IvParameterSpec(ivAdmin))
+        val encryptedPassword = cipherAdmin.doFinal(password.toByteArray(Charsets.UTF_8))
 
-        // 5. Estructura JSON final
+        // 🔹6. Construir JSON final
         val json = JSONObject().apply {
             put("type", "password")
             put("filename", inputFile.nameWithoutExtension)
-            put("ext", inputFile.extension)
+            put("ext", ".${inputFile.extension}")
             put("created_by", userUuid)
 
             put("salt_user", saltUser.toHexString())
             put("salt_admin", saltAdmin.toHexString())
             put("iv_user", ivUser.toHexString())
             put("iv_admin", ivAdmin.toHexString())
-            put("data", encryptedContent.toHexString())
-            put("encrypted_user_password", sealed.toHexString())
+            put("data", cipherText.toHexString())
+            put("encrypted_user_password", encryptedPassword.toHexString())
         }
 
-        // 6. Guardar el archivo cifrado
+        // 🔹7. Guardar archivo cifrado
         val (outputFile, fileName) = getOutputFile(inputFile)
         outputFile.writeText(json.toString())
         saveCopyToDatFolder(fileName, json.toString())
@@ -88,34 +100,55 @@ object Encryptor {
 
 
 
+
     fun encryptWithPublicKey(inputFile: File, publicKeyPEM: String, userUuid: String): File {
-        val secretKey = CryptoUtils.generateAESKey()
-        val iv = CryptoUtils.generateRandomBytes(12)
+        // 🔹1. Empaquetar archivo como JSON base64
+        val fileBytes = inputFile.readBytes()
+        val base64Content = Base64.encodeToString(fileBytes, Base64.NO_WRAP)
 
+        val payload = JSONObject().apply {
+            put("filename", inputFile.name)
+            put("ext", ".${inputFile.extension}")
+            put("content", base64Content)
+        }
+        val payloadBytes = payload.toString().toByteArray(Charsets.UTF_8)
+
+        // 🔹2. Generar AES key e IV
+        val aesKey = CryptoUtils.generateAESKey()
+        val aesKeyBytes = aesKey.encoded
+        val iv = CryptoUtils.generateRandomBytes(12)  // ✅ GCM requiere 12 bytes
+
+        // 🔹3. Cifrado con AES-GCM
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
-        val encrypted = cipher.doFinal(inputFile.readBytes())
+        val gcmSpec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.ENCRYPT_MODE, aesKey, gcmSpec)
+        val cipherText = cipher.doFinal(payloadBytes) // ciphertext + tag al final
 
-        val encryptedKeyUser = CryptoUtils.encryptKeyWithPublicKey(secretKey.encoded, publicKeyPEM)
-        val encryptedKeyMaster = CryptoUtils.encryptKeyWithPublicKey(secretKey.encoded, MasterKey.PUBLIC_KEY_PEM)
+        // 🔹4. Cifrado RSA de la clave AES
+        val encryptedKeyUser = CryptoUtils.encryptKeyWithPublicKey(aesKeyBytes, publicKeyPEM)
+        val encryptedKeyMaster = CryptoUtils.encryptKeyWithPublicKey(aesKeyBytes, MasterKey.PUBLIC_KEY_PEM)
 
+        // 🔹5. JSON resultante
         val json = JSONObject().apply {
             put("type", "rsa")
             put("filename", inputFile.nameWithoutExtension)
-            put("ext", inputFile.extension)
+            put("ext", ".${inputFile.extension}")
             put("created_by", userUuid)
 
             put("key_user", encryptedKeyUser.toHexString())
             put("key_master", encryptedKeyMaster.toHexString())
             put("iv", iv.toHexString())
-            put("data", encrypted.toHexString())
+            put("data", cipherText.toHexString())
         }
 
+        // 🔹6. Guardar archivo
         val (outputFile, fileName) = getOutputFile(inputFile)
         outputFile.writeText(json.toString())
         saveCopyToDatFolder(fileName, json.toString())
         return outputFile
     }
+
+
 
 
 
