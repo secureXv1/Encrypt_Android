@@ -69,8 +69,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import com.safeguard.encrypt_android.ui.screens.EncryptFullScreenDialog
-
-
+import com.safeguard.endcrypt_android.R
 
 
 @OptIn(
@@ -195,6 +194,7 @@ fun EncryptFileScreen() {
                 items(filteredFiles) { file ->
                     SwipeableFileItemV2(
                         file = file,
+                        iconResId = R.drawable.encrypt, // 👈 único ícono a usar aquí
                         isOpen = openFile == file,
                         onSetOpen = { selected -> openFile = if (selected) file else null },
                         onDownload = {
@@ -210,10 +210,10 @@ fun EncryptFileScreen() {
                         },
                         onShare = {
                             postEncryptFile = file
-                        }
-                        ,
+                        },
                         onInfoClick = { infoFile = file }
                     )
+
                     Divider(color = Color.DarkGray, thickness = 0.6.dp)
                 }
             }
@@ -310,6 +310,7 @@ fun FileItemSwipeable(
 @Composable
 fun SwipeableFileItemV2(
     file: File,
+    iconResId: Int, // 👈 NUEVO parámetro
     isOpen: Boolean,
     onSetOpen: (Boolean) -> Unit,
     onDownload: () -> Unit,
@@ -321,7 +322,6 @@ fun SwipeableFileItemV2(
     val swipeThresholdPx = with(LocalDensity.current) { (buttonWidth * 3).toPx() }
     var offsetX by remember { mutableStateOf(0f) }
     var showConfirmDialog by remember { mutableStateOf(false) }
-    val context = LocalContext.current
 
     LaunchedEffect(isOpen) {
         offsetX = if (isOpen) -swipeThresholdPx else 0f
@@ -349,7 +349,7 @@ fun SwipeableFileItemV2(
             modifier = Modifier
                 .matchParentSize()
                 .padding(vertical = 6.dp, horizontal = 6.dp)
-                .clip(RoundedCornerShape(12.dp)) // igual que la tarjeta
+                .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFF263238)),
             contentAlignment = Alignment.CenterEnd
         ) {
@@ -374,18 +374,14 @@ fun SwipeableFileItemV2(
             }
         }
 
-
-        // Contenido deslizable con estilo moderno
+        // Contenido principal deslizable
         Box(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), 0) }
                 .fillMaxSize()
                 .clickable { onInfoClick() }
-                .background(
-                    color = Color(0xFF1E2A2D),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .shadow(4.dp, RoundedCornerShape(12.dp)) // Sombra sutil
+                .background(Color(0xFF1E2A2D), shape = RoundedCornerShape(12.dp))
+                .shadow(4.dp, RoundedCornerShape(12.dp))
                 .padding(horizontal = 12.dp)
         ) {
             Row(
@@ -393,8 +389,8 @@ fun SwipeableFileItemV2(
                 modifier = Modifier.fillMaxSize()
             ) {
                 Image(
-                    painter = painterResource(id = context.resources.getIdentifier("encrypt", "drawable", context.packageName)),
-                    contentDescription = "Archivo cifrado",
+                    painter = painterResource(id = iconResId), // 👈 se usa icono según tipo
+                    contentDescription = "Icono archivo",
                     modifier = Modifier
                         .size(42.dp)
                         .padding(end = 12.dp)
@@ -403,14 +399,14 @@ fun SwipeableFileItemV2(
                 Spacer(Modifier.width(12.dp))
 
                 Column(
-                    modifier = Modifier.weight(1f) // ⬅️ el texto ocupa espacio limitado
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         file.name,
                         color = Color.White,
                         fontSize = 15.sp,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis // ⬅️ para cortar texto largo
+                        overflow = TextOverflow.Ellipsis
                     )
                     Spacer(Modifier.height(1.dp))
                     Text(
@@ -429,7 +425,6 @@ fun SwipeableFileItemV2(
                 )
             }
         }
-
     }
 
     if (showConfirmDialog) {
@@ -453,6 +448,7 @@ fun SwipeableFileItemV2(
         )
     }
 }
+
 
 
 @Composable

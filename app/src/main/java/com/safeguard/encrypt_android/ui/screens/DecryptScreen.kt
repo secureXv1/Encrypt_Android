@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -39,55 +41,136 @@ fun DecryptScreen() {
     val context = LocalContext.current
     val decryptedDir = File(context.filesDir, "EncryptApp/Decrypted").apply { mkdirs() }
     var archivos by remember { mutableStateOf(listarArchivos(decryptedDir)) }
+    var searchQuery by remember { mutableStateOf("") }
     var showDialog by remember { mutableStateOf(false) }
+    var openFile by remember { mutableStateOf<File?>(null) }
+
+    val filteredFiles = archivos.filter {
+        it.name.contains(searchQuery, ignoreCase = true)
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Archivos Descifrados", color = Color.White) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E)),
+                title = { Text("Descifrados", color = Color.White) },
                 actions = {
                     IconButton(onClick = { showDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Agregar",
-                            tint = Color.White
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0xFF00BCD4), RoundedCornerShape(50))
+                                .padding(4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Nuevo",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0F1B1E)),
+                modifier = Modifier.height(52.dp)
             )
         },
-        containerColor = Color(0xFF0F1B1E),
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showDialog = true },
-                containerColor = Color(0xFF00BCD4),
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Nuevo descifrado")
-            }
-        }
+        containerColor = Color(0xFF0F1B1E)
     ) { padding ->
-        Column(modifier = Modifier
-            .padding(padding)
-            .fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .padding(
+                    top = padding.calculateTopPadding() + 12.dp,
+                    start = padding.calculateStartPadding(LayoutDirection.Ltr),
+                    end = padding.calculateEndPadding(LayoutDirection.Ltr),
+                    bottom = padding.calculateBottomPadding()
+                )
+                .fillMaxSize()
+        ) {
 
-            if (archivos.isEmpty()) {
+            // 🔍 Barra de búsqueda
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Buscar archivo", color = Color.LightGray) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Buscar",
+                        tint = Color.Gray,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Limpiar",
+                                tint = Color.Gray
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF00BCD4),
+                    unfocusedBorderColor = Color.DarkGray
+                ),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            // 📂 Lista de archivos
+            if (filteredFiles.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No hay archivos descifrados", color = Color.Gray)
                 }
             } else {
                 LazyColumn {
-                    items(archivos, key = { it.name }) { archivo ->
-                        DecryptedFileItem(
-                            file = archivo,
-                            onDelete = {
-                                archivo.delete()
+                    items(filteredFiles) { file ->
+                        val iconName = when (file.extension.lowercase()) {
+                            "pdf" -> "file_pdf"
+                            "png", "jpg", "jpeg" -> "file_png"
+                            "doc", "docx" -> "file_docx"
+                            "xls", "xlsx" -> "file_xlsx"
+                            "ppt", "pptx" -> "file_ppt"
+                            "mp3" -> "file_mp3"
+                            "mp4" -> "file_mp4"
+                            "zip" -> "file_zip"
+                            "rar" -> "file_rar"
+                            else -> "file_default"
+                        }
+
+                        val iconId = remember(iconName) {
+                            context.resources.getIdentifier(iconName, "drawable", context.packageName)
+                        }
+
+                        val fallbackId = remember {
+                            context.resources.getIdentifier("file_default", "drawable", context.packageName)
+                        }
+
+                        val iconResId = if (iconId != 0) iconId else fallbackId
+
+                        SwipeableFileItemV2(
+                            file = file,
+                            iconResId = iconResId,
+                            isOpen = openFile == file,
+                            onSetOpen = { selected -> openFile = if (selected) file else null },
+                            onDownload = { descargarArchivo(context, file) },
+                            onDeleteConfirmed = {
+                                file.delete()
                                 archivos = listarArchivos(decryptedDir)
                             },
-                            onShare = { compartirArchivo(context, archivo) },
-                            onDownload = { descargarArchivo(context, archivo) }
+                            onShare = { compartirArchivo(context, file) },
+                            onInfoClick = { /* opcional */ }
                         )
+
+                        Divider(color = Color.DarkGray, thickness = 0.6.dp)
                     }
                 }
             }
@@ -103,6 +186,7 @@ fun DecryptScreen() {
         }
     }
 }
+
 
 @Composable
 fun DecryptedFileItem(
@@ -193,44 +277,6 @@ fun DecryptedFileItem(
 }
 
 
-
-
-@Composable
-fun FileCardItem(
-    file: File,
-    onDelete: () -> Unit,
-    onShare: () -> Unit,
-    onDownload: () -> Unit
-) {
-    Card(modifier = Modifier
-        .fillMaxWidth()
-        .padding(8.dp)) {
-        ListItem(
-            overlineContent = null,
-            headlineContent = { Text(file.name) },
-            supportingContent = {
-                Text(
-                    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-                        .format(file.lastModified())
-                )
-            },
-            trailingContent = {
-                Row {
-                    IconButton(onClick = onDownload) {
-                        Icon(Icons.Default.Download, contentDescription = "Descargar")
-                    }
-                    IconButton(onClick = onShare) {
-                        Icon(Icons.Default.Share, contentDescription = "Compartir")
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Eliminar")
-                    }
-                }
-            }
-        )
-
-    }
-}
 
 fun listarArchivos(dir: File): List<File> =
     dir.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() } ?: emptyList()
