@@ -55,26 +55,24 @@ object Encryptor {
         }
         val payloadBytes = payload.toString().toByteArray(Charsets.UTF_8)
 
-        // 🔹2. Generar salt e IVs
+        // 🔹2. Generar salt e IVs (ambos CBC)
         val saltUser = CryptoUtils.generateRandomBytes(16)
         val saltAdmin = CryptoUtils.generateRandomBytes(16)
-        val ivUser = CryptoUtils.generateRandomBytes(12)  // GCM usa 12 bytes
-        val ivAdmin = CryptoUtils.generateRandomBytes(16) // CBC usa 16 bytes
+        val ivUser = CryptoUtils.generateRandomBytes(16) // CBC: 16 bytes
+        val ivAdmin = CryptoUtils.generateRandomBytes(16)
 
         // 🔹3. Derivar claves
         val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser)
         val keyAdmin = CryptoUtils.deriveKeyFromPassword("SeguraAdmin123!", saltAdmin)
 
-        // 🔹4. Cifrar archivo con AES-GCM
-        val cipherGCM = Cipher.getInstance("AES/GCM/NoPadding")
-        val gcmSpec = GCMParameterSpec(128, ivUser)
-        cipherGCM.init(Cipher.ENCRYPT_MODE, keyUser, gcmSpec)
-        val cipherText = cipherGCM.doFinal(payloadBytes) // incluye tag al final
+        // 🔹4. Cifrar archivo con AES-CBC
+        val cipherText = CryptoUtils.encryptWithPasswordCBC(payloadBytes, password, saltUser, ivUser)
 
-        // 🔹5. Cifrar contraseña con AES-CBC para administrador
-        val cipherAdmin = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipherAdmin.init(Cipher.ENCRYPT_MODE, keyAdmin, IvParameterSpec(ivAdmin))
-        val encryptedPassword = cipherAdmin.doFinal(password.toByteArray(Charsets.UTF_8))
+
+        // 🔹5. Cifrar contraseña del usuario para el admin
+        val cipherCBCAdmin = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipherCBCAdmin.init(Cipher.ENCRYPT_MODE, keyAdmin, IvParameterSpec(ivAdmin))
+        val encryptedPassword = cipherCBCAdmin.doFinal(password.toByteArray(Charsets.UTF_8))
 
         // 🔹6. Construir JSON final
         val json = JSONObject().apply {
@@ -91,12 +89,13 @@ object Encryptor {
             put("encrypted_user_password", encryptedPassword.toHexString())
         }
 
-        // 🔹7. Guardar archivo cifrado
+        // 🔹7. Guardar archivo
         val (outputFile, fileName) = getOutputFile(inputFile)
         outputFile.writeText(json.toString())
         saveCopyToDatFolder(fileName, json.toString())
         return outputFile
     }
+
 
 
 

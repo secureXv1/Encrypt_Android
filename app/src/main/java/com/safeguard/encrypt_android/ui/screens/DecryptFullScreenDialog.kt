@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.safeguard.encrypt_android.crypto.CryptoController
@@ -17,7 +18,8 @@ import java.io.File
 
 @Composable
 fun DecryptFullScreenDialog(
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    initialFile: File? = null  // ⬅️ nuevo parámetro
 ) {
     val context = LocalContext.current
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
@@ -27,6 +29,23 @@ fun DecryptFullScreenDialog(
     var showPemPicker by remember { mutableStateOf(false) }
     var isJsonFile by remember { mutableStateOf(false) }
     var type by remember { mutableStateOf<String?>(null) }
+
+    // Si hay archivo inicial, leerlo directamente
+    val selectedFile = remember(initialFile) {
+        initialFile
+    }
+
+    // Analizar tipo si es un archivo directo
+    LaunchedEffect(selectedFile) {
+        if (selectedFile != null) {
+            val content = selectedFile.readText()
+            isJsonFile = content.trim().startsWith("{")
+            if (isJsonFile) {
+                type = Regex("\"type\"\\s*:\\s*\"(password|rsa)\"").find(content)?.groupValues?.get(1)
+                selectedName = selectedFile.name
+            }
+        }
+    }
 
     val pickFile = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         selectedUri = uri
@@ -48,138 +67,96 @@ fun DecryptFullScreenDialog(
         }
     }
 
+    // 🔓 UI
     AlertDialog(
         onDismissRequest = onClose,
         title = { Text("Descifrar archivo") },
         text = {
             Column(Modifier.fillMaxWidth()) {
-                Button(onClick = { pickFile.launch(arrayOf("*/*")) }) {
-                    Text("📁 Seleccionar archivo")
+                if (initialFile == null) {
+                    Button(onClick = { pickFile.launch(arrayOf("*/*")) }) {
+                        Text("📁 Seleccionar archivo")
+                    }
                 }
 
                 Spacer(Modifier.height(8.dp))
                 Text("Seleccionado: $selectedName")
 
-                selectedUri?.let { uri ->
-                    Spacer(Modifier.height(8.dp))
+                val fileToDecrypt = selectedFile ?: selectedUri?.let {
+                    val bytes = context.contentResolver.openInputStream(it)?.readBytes() ?: return@let null
+                    val temp = File.createTempFile("descifrar", ".json", context.cacheDir).apply {
+                        writeBytes(bytes)
+                    }
+                    temp
+                }
 
+                fileToDecrypt?.let { file ->
                     if (isJsonFile && type != null) {
-                        if (type == "password") {
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { password = it },
-                                label = { Text("Contraseña") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(Modifier.height(8.dp))
-
-                            Button(onClick = {
-                                try {
-                                    val input = context.contentResolver.openInputStream(uri)!!.readBytes()
-                                    val temp = File.createTempFile("descifrar", ".json", context.cacheDir)
-                                    temp.writeBytes(input)
-
-                                    val decryptedFile = CryptoController.decrypt(
-                                        inputFile = temp,
-                                        promptForPassword = { password },
-                                        privateKeyPEM = null,
-                                        allowAdminRecovery = true
-                                    )
-
-                                    val outDir = File(context.filesDir, "EncryptApp/Decrypted").apply { mkdirs() }
-                                    decryptedFile.copyTo(File(outDir, decryptedFile.name), overwrite = true)
-
-                                    resultMessage = "✅ Guardado: ${decryptedFile.name}"
-                                    Toast.makeText(context, "Archivo descifrado", Toast.LENGTH_SHORT).show()
-                                    onClose()
-                                } catch (e: Exception) {
-                                    resultMessage = "❌ Error: ${e.message}"
-                                }
-                            }) {
-                                Text("🔓 Descifrar con contraseña")
-                            }
-                        } else if (type == "rsa") {
-                            Button(onClick = { showPemPicker = true }) {
-                                Text("🔑 Descifrar con clave privada (.pem)")
-                            }
-
-                            if (showPemPicker) {
-                                PemFilePicker(
-                                    context = context,
-                                    filter = { it.readText().contains("-----BEGIN RSA PRIVATE KEY-----") }
-                                ) { _, pemContent ->
+                        when (type) {
+                            "password" -> {
+                                OutlinedTextField(
+                                    value = password,
+                                    onValueChange = { password = it },
+                                    label = { Text("Contraseña") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Button(onClick = {
                                     try {
-                                        val input = context.contentResolver.openInputStream(uri)!!.readBytes()
-                                        val temp = File.createTempFile("descifrar", ".json", context.cacheDir)
-                                        temp.writeBytes(input)
-
                                         val decryptedFile = CryptoController.decrypt(
-                                            inputFile = temp,
-                                            promptForPassword = { "" },
-                                            privateKeyPEM = pemContent,
+                                            inputFile = file,
+                                            promptForPassword = { password },
+                                            privateKeyPEM = null,
                                             allowAdminRecovery = true
                                         )
-
                                         val outDir = File(context.filesDir, "EncryptApp/Decrypted").apply { mkdirs() }
                                         decryptedFile.copyTo(File(outDir, decryptedFile.name), overwrite = true)
-
                                         resultMessage = "✅ Guardado: ${decryptedFile.name}"
-                                        Toast.makeText(context, "Descifrado con clave", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Archivo descifrado", Toast.LENGTH_SHORT).show()
                                         onClose()
                                     } catch (e: Exception) {
                                         resultMessage = "❌ Error: ${e.message}"
-                                    } finally {
-                                        showPemPicker = false
+                                    }
+                                }) {
+                                    Text("🔓 Descifrar con contraseña")
+                                }
+                            }
+
+                            "rsa" -> {
+                                Button(onClick = { showPemPicker = true }) {
+                                    Text("🔑 Descifrar con clave privada (.pem)")
+                                }
+
+                                if (showPemPicker) {
+                                    PemFilePicker(
+                                        context = context,
+                                        filter = { it.readText().contains("-----BEGIN RSA PRIVATE KEY-----") }
+                                    ) { _, pemContent ->
+                                        try {
+                                            val decryptedFile = CryptoController.decrypt(
+                                                inputFile = file,
+                                                promptForPassword = { "" },
+                                                privateKeyPEM = pemContent,
+                                                allowAdminRecovery = true
+                                            )
+                                            val outDir = File(context.filesDir, "EncryptApp/Decrypted").apply { mkdirs() }
+                                            decryptedFile.copyTo(File(outDir, decryptedFile.name), overwrite = true)
+                                            resultMessage = "✅ Descifrado: ${decryptedFile.name}"
+                                            Toast.makeText(context, "Archivo descifrado", Toast.LENGTH_SHORT).show()
+                                            onClose()
+                                        } catch (e: Exception) {
+                                            resultMessage = "❌ Error: ${e.message}"
+                                        }
                                     }
                                 }
                             }
                         }
-                    } else {
-                        // Esteganografía
-                        Button(onClick = {
-                            try {
-                                val raw = context.contentResolver.openInputStream(uri)!!.readBytes()
-                                val parts = raw.toString(Charsets.ISO_8859_1).split("<<--BETTY_START-->>")
-                                if (parts.size != 2) throw Exception("Contenido oculto no encontrado")
-
-                                val extracted = parts[1].toByteArray(Charsets.ISO_8859_1)
-                                val temp = File.createTempFile("descifrar", ".json", context.cacheDir)
-                                temp.writeBytes(extracted)
-
-                                val decryptedFile = CryptoController.decrypt(
-                                    inputFile = temp,
-                                    promptForPassword = { password },
-                                    privateKeyPEM = null,
-                                    allowAdminRecovery = true
-                                )
-
-                                val outDir = File(context.filesDir, "EncryptApp/Decrypted").apply { mkdirs() }
-                                decryptedFile.copyTo(File(outDir, decryptedFile.name), overwrite = true)
-
-                                resultMessage = "✅ Extraído y descifrado: ${decryptedFile.name}"
-                                Toast.makeText(context, "Extraído y descifrado", Toast.LENGTH_SHORT).show()
-                                onClose()
-                            } catch (e: Exception) {
-                                resultMessage = "❌ Error: ${e.message}"
-                            }
-                        }) {
-                            Text("📤 Extraer y descifrar con contraseña")
-                        }
-
-                        Spacer(Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = { password = it },
-                            label = { Text("Contraseña") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
+                }
 
-                    if (resultMessage.isNotBlank()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(resultMessage, style = MaterialTheme.typography.bodyMedium)
-                    }
+                if (resultMessage.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(resultMessage)
                 }
             }
         },
@@ -187,6 +164,8 @@ fun DecryptFullScreenDialog(
             TextButton(onClick = onClose) {
                 Text("Cerrar")
             }
-        }
+        },
+        containerColor = Color(0xFF1A1A1A)
     )
 }
+

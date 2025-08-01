@@ -61,6 +61,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import org.json.JSONObject
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.ui.text.style.TextOverflow
@@ -217,32 +220,10 @@ fun EncryptFileScreen() {
         }
 
         infoFile?.let { file ->
-            val json = runCatching {
-                val jsonStr = file.readText()
-                JSONObject(jsonStr)
-            }.getOrNull()
-
-            val tipo = json?.optString("type") ?: "Desconocido"
-            val pesoKb = file.length() / 1024
-
-            AlertDialog(
-                onDismissRequest = { infoFile = null },
-                title = { Text("Información del archivo") },
-                text = {
-                    Column {
-                        Text("📁 ${file.name}")
-                        Text("📅 ${SimpleDateFormat("dd/MM/yyyy, HH:mm", Locale.getDefault()).format(file.lastModified())}")
-                        Text("🗝️ Tipo de cifrado: ${if (tipo == "password") "Contraseña" else if (tipo == "rsa") "Llave pública" else tipo}")
-                        Text("📦 Tamaño: $pesoKb KB")
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { infoFile = null }) {
-                        Text("Cerrar")
-                    }
-                }
-            )
+            InfoDialog(file = file, onDismiss = { infoFile = null })
         }
+
+
 
     }
     // ⬅️ Diálogo full screen
@@ -494,38 +475,92 @@ fun ActionButton(
 }
 
 @Composable
-fun InfoDialog(file: File, onDismiss: () -> Unit) {
-    val content = try {
-        val json = JSONObject(file.readText())
-        val createdAt = json.optString("created_at", "N/A")
-        val type = json.optString("type", "N/A")
-        val keyName = if (type == "rsa") json.optString("key_user", "No especificada") else "—"
-        Triple(createdAt, type.uppercase(), keyName)
+fun InfoDialog(
+    file: File,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var showDecryptDialog by remember { mutableStateOf(false) }
+
+    val tipoCrudo = try {
+        val json = JSONObject(file.readText()).optString("type", "desconocido")
+        json.lowercase()
     } catch (e: Exception) {
-        Triple("Desconocido", "Desconocido", "—")
+        "desconocido"
     }
+
+    val tipo = when (tipoCrudo) {
+        "password" -> "Contraseña"
+        "rsa" -> "Llave"
+        else -> "Desconocido"
+    }
+
+    val fecha = SimpleDateFormat("dd/MM/yyyy, HH:mm", Locale.getDefault()).format(file.lastModified())
+    val pesoKb = file.length() / 1024
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cerrar")
-            }
-        },
-        title = { Text("Información del archivo") },
+        title = { Text("Información del archivo", color = Color.White) },
         text = {
-            Column {
-                Text("📅 Creado: ${content.first}")
-                Spacer(Modifier.height(8.dp))
-                Text("🔐 Tipo de cifrado: ${content.second}")
-                if (content.second == "RSA") {
-                    Spacer(Modifier.height(8.dp))
-                    Text("🔑 Llave usada: ${content.third}")
+            Column(modifier = Modifier.fillMaxWidth()) {
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Folder, contentDescription = null, tint = Color(0xFFFFC107))
+                    Spacer(Modifier.width(8.dp))
+                    Text(file.name, color = Color.White, fontSize = 14.sp)
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DateRange, contentDescription = null, tint = Color(0xFFE91E63))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Fecha de modificación: $fecha", color = Color.LightGray, fontSize = 13.sp)
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF00BCD4))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Tipo de cifrado: $tipo", color = Color.LightGray, fontSize = 13.sp)
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Inventory2, contentDescription = null, tint = Color(0xFF795548))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Tamaño: $pesoKb KB", color = Color.LightGray, fontSize = 13.sp)
                 }
             }
-        }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cerrar", color = Color.LightGray)
+                }
+                TextButton(
+                    onClick = { showDecryptDialog = true },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF00BCD4))
+                ) {
+                    Icon(Icons.Default.Lock, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Descifrar")
+                }
+            }
+        },
+        containerColor = Color(0xFF1A1A1A)
     )
+
+    if (showDecryptDialog) {
+        DecryptFullScreenDialog(
+            initialFile = file,
+            onClose = { showDecryptDialog = false }
+        )
+    }
 }
+
 
 
 

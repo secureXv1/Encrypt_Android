@@ -45,24 +45,8 @@ object Decryptor {
                     )
                 }
 
-                // ✅ Separar ciphertext y tag
-                val tagLength = 16
-                if (encryptedBytes.size <= tagLength) {
-                    throw IllegalArgumentException("❌ Archivo corrupto: datos demasiado cortos para GCM.")
-                }
-
-                val ciphertext = encryptedBytes.copyOfRange(0, encryptedBytes.size - tagLength)
-                val tag = encryptedBytes.copyOfRange(encryptedBytes.size - tagLength, encryptedBytes.size)
-                val fullCombined = ciphertext + tag
-
-                Log.d("Decryptor", "📦 Ciphertext: ${ciphertext.size}, Tag: ${tag.size}, Combined: ${fullCombined.size}")
-
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                val gcmSpec = GCMParameterSpec(128, iv)
-                cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), gcmSpec)
-                cipher.doFinal(fullCombined)
+                decryptGCM(keyBytes, iv, encryptedBytes)
             }
-
 
             "password" -> {
                 val password = promptForPassword()
@@ -70,23 +54,10 @@ object Decryptor {
                 val ivUser = json.getString("iv_user").hexToByteArray()
                 Log.d("Decryptor", "🔐 [PWD] IV length: ${ivUser.size}, Data length: ${encryptedBytes.size}")
 
-                val keyUser = CryptoUtils.deriveKeyFromPassword(password, saltUser)
-
                 try {
-                    val tagLength = 16
-                    if (encryptedBytes.size <= tagLength) {
-                        throw IllegalArgumentException("❌ Archivo corrupto: datos demasiado cortos para GCM.")
-                    }
-
-                    val ciphertext = encryptedBytes.copyOfRange(0, encryptedBytes.size - tagLength)
-                    val tag = encryptedBytes.copyOfRange(encryptedBytes.size - tagLength, encryptedBytes.size)
-                    val fullCombined = ciphertext + tag
-
-                    val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                    cipher.init(Cipher.DECRYPT_MODE, keyUser, GCMParameterSpec(128, ivUser))
-                    cipher.doFinal(fullCombined)
-
-                } catch (e: Exception) {
+                    CryptoUtils.decryptWithPasswordCBC(encryptedBytes, password, saltUser, ivUser)
+                }
+                catch (e: Exception) {
                     Log.e("Decryptor", "❌ Descifrado con contraseña falló: ${e.message}")
                     if (!allowAdminRecovery) throw IllegalArgumentException("❌ Contraseña incorrecta.")
 
@@ -106,20 +77,9 @@ object Decryptor {
                         val recoveredPassword = cipherAdmin.doFinal(encryptedPassword).toString(Charsets.UTF_8)
                         Log.d("Decryptor", "✅ Contraseña recuperada: $recoveredPassword")
 
-                        val recoveredKey = CryptoUtils.deriveKeyFromPassword(recoveredPassword, saltUser)
+                        CryptoUtils.decryptWithPasswordCBC(encryptedBytes, recoveredPassword, saltUser, ivUser)
 
-                        val tagLength = 16
-                        if (encryptedBytes.size <= tagLength) {
-                            throw IllegalArgumentException("❌ Archivo corrupto: datos demasiado cortos para GCM.")
-                        }
 
-                        val ciphertext = encryptedBytes.copyOfRange(0, encryptedBytes.size - tagLength)
-                        val tag = encryptedBytes.copyOfRange(encryptedBytes.size - tagLength, encryptedBytes.size)
-                        val fullCombined = ciphertext + tag
-
-                        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                        cipher.init(Cipher.DECRYPT_MODE, recoveredKey, GCMParameterSpec(128, ivUser))
-                        cipher.doFinal(fullCombined)
 
                     } catch (ex: Exception) {
                         Log.e("Decryptor", "❌ Recuperación con clave maestra fallida: ${ex.message}")
@@ -127,7 +87,6 @@ object Decryptor {
                     }
                 }
             }
-
 
             else -> throw IllegalArgumentException("❌ Tipo de archivo no soportado: $type")
         }
@@ -148,4 +107,24 @@ object Decryptor {
 
         return resultadoFinal
     }
+
+    private fun decryptGCM(keyBytes: ByteArray, iv: ByteArray, encrypted: ByteArray): ByteArray {
+        if (encrypted.size < 32) {
+            throw IllegalArgumentException("❌ Archivo GCM inválido: muy corto.")
+        }
+
+        Log.d("Decryptor", "📦 GCM: total=${encrypted.size}, iv=${iv.size}, key=${keyBytes.size}")
+
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        val gcmSpec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), gcmSpec)
+        return cipher.doFinal(encrypted) // ✅ combinado: ciphertext + tag
+    }
+
+    private fun decryptCBC(keyBytes: ByteArray, iv: ByteArray, encrypted: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), IvParameterSpec(iv))
+        return cipher.doFinal(encrypted)
+    }
+
 }

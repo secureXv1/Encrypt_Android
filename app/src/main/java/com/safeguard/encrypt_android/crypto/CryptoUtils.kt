@@ -6,14 +6,13 @@ import org.bouncycastle.asn1.ASN1Primitive
 import java.security.*
 import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.RSAPrivateKeySpec
-import java.security.spec.RSAPublicKeySpec
-import java.security.spec.X509EncodedKeySpec
+import java.security.spec.*
 import javax.crypto.*
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.PSource
 import javax.crypto.spec.SecretKeySpec
 import org.bouncycastle.asn1.pkcs.RSAPrivateKey as BcRSAPrivateKey
 import org.bouncycastle.asn1.pkcs.RSAPublicKey as BcRSAPublicKey
@@ -52,18 +51,26 @@ object CryptoUtils {
         }
 
         val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
-        cipher.init(Cipher.ENCRYPT_MODE, publicKey)
+        val oaepParams = OAEPParameterSpec(
+            "SHA-256", "MGF1", MGF1ParameterSpec.SHA256, PSource.PSpecified.DEFAULT
+        )
+        cipher.init(Cipher.ENCRYPT_MODE, publicKey, oaepParams)
         return cipher.doFinal(aesKey)
     }
 
-
-
-
     fun decryptKeyWithPrivateKey(encryptedKey: ByteArray, privateKeyPEM: String): ByteArray {
         val privateKey = decodeRSAPrivateKeyPKCS1(privateKeyPEM)
-        val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding")
-        cipher.init(Cipher.DECRYPT_MODE, privateKey)
-        return cipher.doFinal(encryptedKey)
+        val cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding")
+        val oaepParams = OAEPParameterSpec(
+            "SHA-256", "MGF1", MGF1ParameterSpec.SHA256, PSource.PSpecified.DEFAULT
+        )
+        return try {
+            cipher.init(Cipher.DECRYPT_MODE, privateKey, oaepParams)
+            cipher.doFinal(encryptedKey)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("❌ RSA decryption failed: ${e.message}")
+        }
+
     }
 
     @Deprecated("Usa GCM en lugar de CBC", ReplaceWith("decryptWithPasswordGCM(...)"))
@@ -126,7 +133,27 @@ object CryptoUtils {
         val spec = BcRSAPublicKey.getInstance(ASN1Primitive.fromByteArray(pkcs1))
         val rsaSpec = RSAPublicKeySpec(spec.modulus, spec.publicExponent)
         val publicKey = KeyFactory.getInstance("RSA").generatePublic(rsaSpec)
-        return publicKey.encoded // Esta es la forma correcta y segura
+        return publicKey.encoded
     }
+
+    fun encryptWithPasswordCBC(data: ByteArray, password: String, salt: ByteArray, iv: ByteArray): ByteArray {
+        val secretKey = deriveKeyFromPassword(password, salt)
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, IvParameterSpec(iv))
+        return cipher.doFinal(data)
+    }
+
+    fun decryptWithPasswordCBC(
+        encrypted: ByteArray,
+        password: String,
+        salt: ByteArray,
+        iv: ByteArray
+    ): ByteArray {
+        val secretKey = deriveKeyFromPassword(password, salt)
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
+        return cipher.doFinal(encrypted)
+    }
+
 
 }
